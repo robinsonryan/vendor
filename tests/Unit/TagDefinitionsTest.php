@@ -7,52 +7,48 @@ use RobinsonRyan\Vendor\TagDefinitions\VendorTypeDefinition;
 
 describe('VendorTypeDefinition', function () {
     it('has correct slug', function () {
-        expect(VendorTypeDefinition::slug())->toBe('vendor-type');
+        expect(VendorTypeDefinition::$slug)->toBe('vendor-type');
     });
 
-    it('has expected values', function () {
-        $values = VendorTypeDefinition::values();
-
-        expect($values)->toContain('supplier')
-            ->and($values)->toContain('contractor')
-            ->and($values)->toContain('service_provider');
+    it('has correct name', function () {
+        expect(VendorTypeDefinition::$name)->toBe('Vendor Type');
     });
 
-    it('has supplier as default', function () {
-        expect(VendorTypeDefinition::defaultValue())->toBe('supplier');
+    it('is single select', function () {
+        expect(VendorTypeDefinition::$singleSelect)->toBeTrue();
     });
 
-    it('has labels for all values', function () {
-        $labels = VendorTypeDefinition::labels();
+    it('is global', function () {
+        expect(VendorTypeDefinition::$global)->toBeTrue();
+    });
 
-        expect($labels)->toHaveKey('supplier', 'Supplier')
-            ->and($labels)->toHaveKey('contractor', 'Contractor')
-            ->and($labels)->toHaveKey('service_provider', 'Service Provider');
+    it('has expected default values', function () {
+        expect(VendorTypeDefinition::DEFAULT_VALUES)->toContain('supplier')
+            ->and(VendorTypeDefinition::DEFAULT_VALUES)->toContain('contractor')
+            ->and(VendorTypeDefinition::DEFAULT_VALUES)->toContain('service_provider');
     });
 });
 
 describe('VendorStatusDefinition', function () {
     it('has correct slug', function () {
-        expect(VendorStatusDefinition::slug())->toBe('vendor-status');
+        expect(VendorStatusDefinition::$slug)->toBe('vendor-status');
     });
 
-    it('has expected values', function () {
-        $values = VendorStatusDefinition::values();
-
-        expect($values)->toContain('active')
-            ->and($values)->toContain('inactive')
-            ->and($values)->toContain('suspended');
+    it('has correct name', function () {
+        expect(VendorStatusDefinition::$name)->toBe('Vendor Status');
     });
 
-    it('has active as default', function () {
-        expect(VendorStatusDefinition::defaultValue())->toBe('active');
+    it('is single select', function () {
+        expect(VendorStatusDefinition::$singleSelect)->toBeTrue();
     });
 
-    it('has labels for all values', function () {
-        $labels = VendorStatusDefinition::labels();
+    it('is global', function () {
+        expect(VendorStatusDefinition::$global)->toBeTrue();
+    });
 
-        expect($labels)->toHaveKey('active', 'Active')
-            ->and($labels)->toHaveKey('inactive', 'Inactive')
-            ->and($labels)->toHaveKey('suspended', 'Suspended');
+    it('has expected default values', function () {
+        expect(VendorStatusDefinition::DEFAULT_VALUES)->toContain('active')
+            ->and(VendorStatusDefinition::DEFAULT_VALUES)->toContain('inactive')
+            ->and(VendorStatusDefinition::DEFAULT_VALUES)->toContain('suspended');
     });
 });

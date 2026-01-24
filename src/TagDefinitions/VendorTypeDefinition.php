@@ -8,31 +8,16 @@ use RobinsonRyan\Taxon\TagDefinition;
 
 final class VendorTypeDefinition extends TagDefinition
 {
-    public static function slug(): string
-    {
-        return 'vendor-type';
-    }
+    public static string $slug = 'vendor-type';
 
-    public static function values(): array
-    {
-        return [
-            'supplier',
-            'contractor',
-            'service_provider',
-        ];
-    }
+    public static string $name = 'Vendor Type';
 
-    public static function defaultValue(): string
-    {
-        return 'supplier';
-    }
+    public static bool $singleSelect = true;
 
-    public static function labels(): array
-    {
-        return [
-            'supplier' => 'Supplier',
-            'contractor' => 'Contractor',
-            'service_provider' => 'Service Provider',
-        ];
-    }
+    public static bool $global = true;
+
+    /**
+     * @var list<string>
+     */
+    public const array DEFAULT_VALUES = ['supplier', 'contractor', 'service_provider'];
 }

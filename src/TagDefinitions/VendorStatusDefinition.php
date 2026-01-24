@@ -8,31 +8,16 @@ use RobinsonRyan\Taxon\TagDefinition;
 
 final class VendorStatusDefinition extends TagDefinition
 {
-    public static function slug(): string
-    {
-        return 'vendor-status';
-    }
+    public static string $slug = 'vendor-status';
 
-    public static function values(): array
-    {
-        return [
-            'active',
-            'inactive',
-            'suspended',
-        ];
-    }
+    public static string $name = 'Vendor Status';
 
-    public static function defaultValue(): string
-    {
-        return 'active';
-    }
+    public static bool $singleSelect = true;
 
-    public static function labels(): array
-    {
-        return [
-            'active' => 'Active',
-            'inactive' => 'Inactive',
-            'suspended' => 'Suspended',
-        ];
-    }
+    public static bool $global = true;
+
+    /**
+     * @var list<string>
+     */
+    public const array DEFAULT_VALUES = ['active', 'inactive', 'suspended'];
 }

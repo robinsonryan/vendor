@@ -5,5 +5,9 @@ parameters:
     paths:
         - src
     level: 8
+    # Pin analysis to the declared floor. Without it the package is developed on
+    # the PHP 8.4 DDEV container, so 8.3-only syntax analyses clean here and
+    # fatals in a consumer running 8.2.
+    phpVersion: 80200
+    tmpDir: .phpstan.cache
     ignoreErrors: []
-    checkMissingIterableValueType: false

@@ -29,11 +29,11 @@ fields:
       unique: This vendor code is already in use.
   type:
     type: vocabulary
-    vocabulary: vendor_type
+    vocabulary: vendor::vendor_type
     default: supplier
   status:
     type: vocabulary
-    vocabulary: vendor_status
+    vocabulary: vendor::vendor_status
     default: active
   contact_name:
     type: text

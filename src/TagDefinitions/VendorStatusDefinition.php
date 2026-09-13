@@ -19,5 +19,5 @@ final class VendorStatusDefinition extends TagDefinition
     /**
      * @var list<string>
      */
-    public const array DEFAULT_VALUES = ['active', 'inactive', 'suspended'];
+    public const DEFAULT_VALUES = ['active', 'inactive', 'suspended'];
 }

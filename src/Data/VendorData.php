@@ -6,6 +6,9 @@ namespace RobinsonRyan\Vendor\Data;
 
 final readonly class VendorData
 {
+    /**
+     * @param  array<string, mixed>|null  $metadata
+     */
     public function __construct(
         public string $name,
         public ?string $tenantId = null,
@@ -73,6 +76,6 @@ final readonly class VendorData
             'website' => $this->website,
             'notes' => $this->notes,
             'metadata' => $this->metadata,
-        ], fn ($value): bool => $value !== null);
+        ], fn (string|array|null $value): bool => $value !== null);
     }
 }

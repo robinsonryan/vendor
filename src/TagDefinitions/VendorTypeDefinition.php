@@ -19,5 +19,5 @@ final class VendorTypeDefinition extends TagDefinition
     /**
      * @var list<string>
      */
-    public const array DEFAULT_VALUES = ['supplier', 'contractor', 'service_provider'];
+    public const DEFAULT_VALUES = ['supplier', 'contractor', 'service_provider'];
 }

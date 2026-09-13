@@ -1,6 +1,7 @@
 <?php
 
 declare(strict_types=1);
+use RobinsonRyan\Vendor\Models\Vendor;
 
 return [
     /*
@@ -49,6 +50,6 @@ return [
     |
     */
     'models' => [
-        'vendor' => \RobinsonRyan\Vendor\Models\Vendor::class,
+        'vendor' => Vendor::class,
     ],
 ];

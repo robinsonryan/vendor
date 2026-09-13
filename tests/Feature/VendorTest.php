@@ -7,8 +7,8 @@ use RobinsonRyan\Vendor\Actions\UpdateVendor;
 use RobinsonRyan\Vendor\Data\VendorData;
 use RobinsonRyan\Vendor\Models\Vendor;
 
-describe('Vendor Model', function () {
-    it('can be created with factory', function () {
+describe('Vendor Model', function (): void {
+    it('can be created with factory', function (): void {
         $vendor = Vendor::factory()->create();
 
         expect($vendor)->toBeInstanceOf(Vendor::class)
@@ -16,43 +16,43 @@ describe('Vendor Model', function () {
             ->and($vendor->name)->not->toBeNull();
     });
 
-    it('has default type of supplier', function () {
+    it('has default type of supplier', function (): void {
         $vendor = Vendor::factory()->create();
 
         expect($vendor->type)->toBe('supplier');
     });
 
-    it('has default status of active', function () {
+    it('has default status of active', function (): void {
         $vendor = Vendor::factory()->create();
 
         expect($vendor->status)->toBe('active');
     });
 
-    it('can be created as contractor type', function () {
+    it('can be created as contractor type', function (): void {
         $vendor = Vendor::factory()->contractor()->create();
 
         expect($vendor->type)->toBe('contractor');
     });
 
-    it('can be created as service provider type', function () {
+    it('can be created as service provider type', function (): void {
         $vendor = Vendor::factory()->serviceProvider()->create();
 
         expect($vendor->type)->toBe('service_provider');
     });
 
-    it('can be created as inactive', function () {
+    it('can be created as inactive', function (): void {
         $vendor = Vendor::factory()->inactive()->create();
 
         expect($vendor->status)->toBe('inactive');
     });
 
-    it('can be created as suspended', function () {
+    it('can be created as suspended', function (): void {
         $vendor = Vendor::factory()->suspended()->create();
 
         expect($vendor->status)->toBe('suspended');
     });
 
-    it('casts metadata to array', function () {
+    it('casts metadata to array', function (): void {
         $vendor = Vendor::factory()->create([
             'metadata' => ['key' => 'value'],
         ]);
@@ -62,8 +62,8 @@ describe('Vendor Model', function () {
     });
 });
 
-describe('CreateVendor Action', function () {
-    it('creates a vendor from data object', function () {
+describe('CreateVendor Action', function (): void {
+    it('creates a vendor from data object', function (): void {
         $data = new VendorData(
             name: 'Test Vendor',
             code: 'TEST-001',
@@ -71,7 +71,7 @@ describe('CreateVendor Action', function () {
             status: 'active',
         );
 
-        $action = new CreateVendor();
+        $action = new CreateVendor;
         $vendor = $action->execute($data);
 
         expect($vendor)->toBeInstanceOf(Vendor::class)
@@ -81,7 +81,7 @@ describe('CreateVendor Action', function () {
             ->and($vendor->status)->toBe('active');
     });
 
-    it('creates a vendor with all fields', function () {
+    it('creates a vendor with all fields', function (): void {
         $data = new VendorData(
             name: 'Full Vendor',
             code: 'FULL-001',
@@ -100,7 +100,7 @@ describe('CreateVendor Action', function () {
             metadata: ['custom' => 'data'],
         );
 
-        $action = new CreateVendor();
+        $action = new CreateVendor;
         $vendor = $action->execute($data);
 
         expect($vendor->contact_name)->toBe('John Doe')
@@ -110,8 +110,8 @@ describe('CreateVendor Action', function () {
     });
 });
 
-describe('UpdateVendor Action', function () {
-    it('updates a vendor from data object', function () {
+describe('UpdateVendor Action', function (): void {
+    it('updates a vendor from data object', function (): void {
         $vendor = Vendor::factory()->create([
             'name' => 'Original Name',
         ]);
@@ -122,7 +122,7 @@ describe('UpdateVendor Action', function () {
             status: 'inactive',
         );
 
-        $action = new UpdateVendor();
+        $action = new UpdateVendor;
         $updated = $action->execute($vendor, $data);
 
         expect($updated->name)->toBe('Updated Name')
@@ -131,8 +131,8 @@ describe('UpdateVendor Action', function () {
     });
 });
 
-describe('VendorData', function () {
-    it('can be created from array', function () {
+describe('VendorData', function (): void {
+    it('can be created from array', function (): void {
         $data = VendorData::fromArray([
             'name' => 'Array Vendor',
             'code' => 'ARR-001',
@@ -145,7 +145,7 @@ describe('VendorData', function () {
             ->and($data->contactEmail)->toBe('test@example.com');
     });
 
-    it('can be converted to array', function () {
+    it('can be converted to array', function (): void {
         $data = new VendorData(
             name: 'Test Vendor',
             code: 'TEST-001',

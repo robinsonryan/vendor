@@ -1,0 +1,14 @@
+# The package's composer.json resolves robinsonryan/taxon from `../taxon`, a
+# sibling checkout on the host. Without this mount that path does not exist
+# inside the container and `composer install` — and therefore the whole quality
+# gate — cannot run at all.
+#
+# The target mirrors the host layout: DDEV mounts the project at
+# /var/www/html, so `../taxon` resolves to /var/www/taxon and composer's
+# relative path repository works unchanged in both places.
+services:
+  web:
+    volumes:
+      - type: bind
+        source: ../../taxon
+        target: /var/www/taxon

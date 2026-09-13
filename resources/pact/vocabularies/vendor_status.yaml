@@ -1,0 +1,10 @@
+format: pact/1
+vocabulary: vendor_status
+label: Vendor status
+
+backed_by: taxon RobinsonRyan\Vendor\TagDefinitions\VendorStatusDefinition
+open: true
+values:
+  active:    Active
+  inactive:  Inactive
+  suspended: Suspended

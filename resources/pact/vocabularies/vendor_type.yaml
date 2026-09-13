@@ -1,0 +1,16 @@
+format: pact/1
+vocabulary: vendor_type
+label: Vendor type
+
+# Taxon-backed, not a literal list: the values live in the `vendor-type` tag
+# tree and an administrator may add one at any time. Validation therefore asks
+# the definition (Pact emits the registered `taxon_value` rule) instead of a
+# hard-coded `in:` list that goes stale — the drift bug this shape exists to
+# close. The values below are what the definition seeds; they are what
+# TypeScript and JSON Schema know at emit time, widened by `open: true`.
+backed_by: taxon RobinsonRyan\Vendor\TagDefinitions\VendorTypeDefinition
+open: true
+values:
+  supplier:         Supplier
+  contractor:       Contractor
+  service_provider: Service provider

@@ -1,0 +1,104 @@
+format: pact/1
+shape: vendor
+model: RobinsonRyan\Vendor\Models\Vendor
+key: uuid7
+tenant: tenant_id
+timestamps: true
+
+label: Vendor
+label_plural: Vendors
+
+# The package ships this shape so an application with Pact installed gets the
+# vendor contract — validation per context, resource output, the index page's
+# query contract, TypeScript — without restating it. Applications extend it
+# (`extends: vendor::vendor`) and override; they never edit it.
+
+fields:
+  name:
+    type: text
+    label: Vendor name
+    rules: [max: 255]
+  code:
+    type: text
+    nullable: true
+    label: Vendor code
+    help: Your own reference for this vendor. Must be unique.
+    rules: [max: 50, unique]
+    messages:
+      unique: This vendor code is already in use.
+  type:
+    type: vocabulary
+    vocabulary: vendor_type
+    default: supplier
+  status:
+    type: vocabulary
+    vocabulary: vendor_status
+    default: active
+  contact_name:
+    type: text
+    nullable: true
+    label: Contact name
+    rules: [max: 255]
+  contact_email:
+    type: email
+    nullable: true
+    label: Contact email
+    rules: [max: 255]
+  contact_phone:
+    # Deliberately `text`, not `phone`: the column is a plain string and the
+    # package accepts extensions and non-US numbers as typed. An application
+    # that wants E.164 overrides the type in its own shape.
+    type: text
+    nullable: true
+    label: Contact phone
+    rules: [max: 50]
+  address_line_1:
+    type: text
+    nullable: true
+    label: Address line 1
+    rules: [max: 255]
+  address_line_2:
+    type: text
+    nullable: true
+    label: Address line 2
+    rules: [max: 255]
+  city:
+    type: text
+    nullable: true
+    rules: [max: 100]
+  state:
+    type: text
+    nullable: true
+    label: State or province
+    rules: [max: 100]
+  postal_code:
+    type: text
+    nullable: true
+    label: Postal code
+    rules: [max: 20]
+  country:
+    type: text
+    nullable: true
+    rules: [max: 100]
+  website:
+    type: url
+    nullable: true
+    rules: [max: 255]
+  notes:
+    type: textarea
+    nullable: true
+    rules: [max: 5000]
+    contexts:
+      list: { hidden: true }
+  metadata:
+    type: json
+    nullable: true
+    contexts:
+      list: { hidden: true }
+
+query:
+  filters: [name, code, type, status]
+  sorts: [name, code, created_at]
+  default_sort: name
+  fields: true
+  per_page: { default: 25, max: 100 }

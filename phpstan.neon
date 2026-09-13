@@ -4,10 +4,21 @@ includes:
 parameters:
     paths:
         - src
+        # Fixture consumer models are the only classes that use the package's
+        # traits; without them PHPStan reports trait.unused.
+        - tests/Fixtures
     level: 8
     # Pin analysis to the declared floor. Without it the package is developed on
     # the PHP 8.4 DDEV container, so 8.3-only syntax analyses clean here and
     # fatals in a consumer running 8.2.
     phpVersion: 80200
     tmpDir: .phpstan.cache
-    ignoreErrors: []
+    ignoreErrors:
+        # Pact is an optional integration: the provider hands Pact the vendor
+        # shape when an application has Pact installed, guarded by
+        # class_exists(). Pact absent is the supported state here, not a
+        # missing symbol.
+        -
+            identifier: class.notFound
+            message: '#RobinsonRyan\\Pact#'
+            path: src/VendorServiceProvider.php

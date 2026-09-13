@@ -53,7 +53,9 @@ final class VendorFactory extends Factory
     public function serviceProvider(): self
     {
         return $this->state(fn (): array => [])->afterCreating(function (Vendor $vendor): void {
-            $vendor->type = 'service_provider';
+            // Taxon stores a value slugged, so this is the spelling the row
+            // holds and the spelling a read gives back.
+            $vendor->type = 'service-provider';
             $vendor->save();
         });
     }

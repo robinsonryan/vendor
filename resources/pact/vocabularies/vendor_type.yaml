@@ -10,7 +10,10 @@ label: Vendor type
 # TypeScript and JSON Schema know at emit time, widened by `open: true`.
 backed_by: taxon RobinsonRyan\Vendor\TagDefinitions\VendorTypeDefinition
 open: true
+# Written the way taxon stores them: a value goes into the tag tree slugged,
+# so `service_provider` names a row the table does not hold (Pact build
+# decision B30, reported as `vocabulary.value.unslugged`).
 values:
   supplier:         Supplier
   contractor:       Contractor
-  service_provider: Service provider
+  service-provider: Service provider

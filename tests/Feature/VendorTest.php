@@ -37,7 +37,10 @@ describe('Vendor Model', function (): void {
     it('can be created as service provider type', function (): void {
         $vendor = Vendor::factory()->serviceProvider()->create();
 
-        expect($vendor->type)->toBe('service_provider');
+        // Taxon slugs a value on the way in and on the way back out, so the
+        // stored spelling is the hyphenated one — which is what the shape
+        // declares and what the emitted types publish.
+        expect($vendor->type)->toBe('service-provider');
     });
 
     it('can be created as inactive', function (): void {

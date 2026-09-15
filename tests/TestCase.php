@@ -24,17 +24,17 @@ abstract class TestCase extends Orchestra
     protected function defineDatabaseMigrations(): void
     {
         // Taxon's tables first: `type` and `status` are taxon tag attributes,
-        // so every vendor write reads the `tags` table. Without this the whole
-        // Feature suite fails on "no such table: tags".
-        $this->loadMigrationsFrom(dirname(__DIR__).'/../taxon/database/migrations');
+        // so every vendor write reads the `tags` table. Taxon is an installed
+        // dependency here, so its migrations come from vendor/.
+        $this->loadMigrationsFrom(__DIR__.'/../vendor/robinsonryan/taxon/database/migrations');
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
     }
 
     protected function getEnvironmentSetUp($app): void
     {
-        // Real PostgreSQL, not SQLite: the package's own doctrine is that a
-        // suite runs on the engine production runs on, and SQLite's loose type
-        // affinity cannot see a uuid/bigint/varchar mismatch.
+        // The package schema relies on PostgreSQL's native uuidv7() as a column
+        // default, so the suite runs against a real Postgres database (the DDEV
+        // `db` service) rather than SQLite.
         $app['config']->set('database.default', 'testing');
         $app['config']->set('database.connections.testing', [
             'driver' => 'pgsql',
@@ -50,10 +50,7 @@ abstract class TestCase extends Orchestra
             'sslmode' => 'prefer',
         ]);
 
-        // Vendors are keyed by UUID, so the `taggables.taggable_id` column that
-        // holds them must be too. Left at taxon's `incrementing` default it is
-        // a bigint, and every tag write fails on "invalid input syntax for type
-        // bigint".
-        $app['config']->set('taxon.taggable_id_type', 'uuid7');
+        // Vendors are uuid-keyed, so taggables.taggable_id must be a uuid column.
+        $app['config']->set('taxon.id_type', 'uuid7');
     }
 }

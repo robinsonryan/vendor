@@ -1,7 +1,12 @@
 {
     "name": "robinsonryan/vendor",
     "description": "Standalone vendor/supplier management for Laravel applications",
-    "keywords": ["laravel", "vendor", "supplier", "management"],
+    "keywords": [
+        "laravel",
+        "vendor",
+        "supplier",
+        "management"
+    ],
     "license": "MIT",
     "authors": [
         {
@@ -10,11 +15,8 @@
     ],
     "repositories": [
         {
-            "type": "path",
-            "url": "../taxon",
-            "options": {
-                "symlink": true
-            }
+            "type": "vcs",
+            "url": "https://github.com/robinsonryan/taxon.git"
         }
     ],
     "require": {
@@ -22,7 +24,7 @@
         "illuminate/contracts": "^11.0|^12.0|^13.0",
         "illuminate/database": "^11.0|^12.0|^13.0",
         "illuminate/support": "^11.0|^12.0|^13.0",
-        "robinsonryan/taxon": "@dev"
+        "robinsonryan/taxon": "^0.6.0"
     },
     "require-dev": {
         "larastan/larastan": "^3.0",
@@ -57,7 +59,7 @@
             "pestphp/pest-plugin": true
         }
     },
-    "minimum-stability": "dev",
+    "minimum-stability": "stable",
     "prefer-stable": true,
     "scripts": {
         "test": "pest",

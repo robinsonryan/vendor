@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace RobinsonRyan\Vendor\Models;
 
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 use RobinsonRyan\Taxon\HasTags;
+use RobinsonRyan\Vendor\Concerns\HasUuidPrimaryKey;
 use RobinsonRyan\Vendor\Database\Factories\VendorFactory;
 use RobinsonRyan\Vendor\TagDefinitions\VendorStatusDefinition;
 use RobinsonRyan\Vendor\TagDefinitions\VendorTypeDefinition;
@@ -41,7 +41,7 @@ final class Vendor extends Model
     use HasFactory;
 
     use HasTags;
-    use HasUuids;
+    use HasUuidPrimaryKey;
 
     /** @var array<string, class-string> */
     protected array $tagAttributes = [

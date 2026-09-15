@@ -38,8 +38,7 @@ describe('Vendor Model', function (): void {
         $vendor = Vendor::factory()->serviceProvider()->create();
 
         // Taxon slugs a value on the way in and on the way back out, so the
-        // stored spelling is the hyphenated one — which is what the shape
-        // declares and what the emitted types publish.
+        // stored spelling is the hyphenated one.
         expect($vendor->type)->toBe('service-provider');
     });
 

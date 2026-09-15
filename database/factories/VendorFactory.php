@@ -15,6 +15,25 @@ final class VendorFactory extends Factory
     protected $model = Vendor::class;
 
     /**
+     * A vendor made by the factory carries the same defaults a vendor made
+     * through CreateVendor / VendorData does: type `supplier`, status `active`.
+     * Both are taxon tag attributes, so they can only be applied once the row
+     * exists; an explicit state (contractor(), inactive(), ...) wins.
+     */
+    public function configure(): static
+    {
+        return $this->afterCreating(function (Vendor $vendor): void {
+            if ($vendor->type === null) {
+                $vendor->type = 'supplier';
+            }
+
+            if ($vendor->status === null) {
+                $vendor->status = 'active';
+            }
+        });
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function definition(): array
@@ -53,7 +72,9 @@ final class VendorFactory extends Factory
     public function serviceProvider(): self
     {
         return $this->state(fn (): array => [])->afterCreating(function (Vendor $vendor): void {
-            $vendor->type = 'service_provider';
+            // Taxon stores a value slugged, so this is the spelling the row
+            // holds and the spelling a read gives back.
+            $vendor->type = 'service-provider';
             $vendor->save();
         });
     }

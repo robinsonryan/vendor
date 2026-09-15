@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace RobinsonRyan\Vendor\Models;
 
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 use RobinsonRyan\Taxon\HasTags;
+use RobinsonRyan\Vendor\Concerns\HasUuidPrimaryKey;
 use RobinsonRyan\Vendor\Database\Factories\VendorFactory;
 use RobinsonRyan\Vendor\TagDefinitions\VendorStatusDefinition;
 use RobinsonRyan\Vendor\TagDefinitions\VendorTypeDefinition;
@@ -17,6 +18,8 @@ use RobinsonRyan\Vendor\TagDefinitions\VendorTypeDefinition;
  * @property string|null $tenant_id
  * @property string $name
  * @property string|null $code
+ * @property string|null $type taxon tag attribute, see $tagAttributes
+ * @property string|null $status taxon tag attribute, see $tagAttributes
  * @property string|null $contact_name
  * @property string|null $contact_email
  * @property string|null $contact_phone
@@ -28,15 +31,17 @@ use RobinsonRyan\Vendor\TagDefinitions\VendorTypeDefinition;
  * @property string|null $country
  * @property string|null $website
  * @property string|null $notes
- * @property array|null $metadata
- * @property \Illuminate\Support\Carbon|null $created_at
- * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property array<string, mixed>|null $metadata
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
  */
 final class Vendor extends Model
 {
+    /** @use HasFactory<VendorFactory> */
     use HasFactory;
+
     use HasTags;
-    use HasUuids;
+    use HasUuidPrimaryKey;
 
     /** @var array<string, class-string> */
     protected array $tagAttributes = [

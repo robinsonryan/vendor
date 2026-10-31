@@ -13,6 +13,7 @@ On `0.x`, every minor release may break.
 - `PostVendorDocument` takes a transaction-scoped PostgreSQL advisory lock on (source, source ref), so two simultaneous first posts of one document no longer fail on the unique index: the second waits, then compares versions
 - A vendor whose only address field is `country` now gets a party address, so `copy_vendor_contacts_to_parties` and the sync no longer leave that value only in a column the held drop destroys. **Upgrade note:** the copy is safe to rerun, so a 0.3.0 install can run `SyncVendorContacts` to pick up such a vendor
 - `VendorItem` stores the normalized part number on every model write, through a mutator rather than in `ResolveVendorItem` alone, so `pr60-asf` can no longer sit beside `PR60-ASF` for one vendor. The `desc:` prefix of a description key is kept. New `VendorPartNumber::key()`. The unique index is unchanged, so a query-builder write still has to pass a normalized key
+- `RecordVendorContact` compares both street lines when it dedupes a remit-to address, so `123 Main St, Suite 4` read off a document matches a migrated address holding the suite on line two, and two suites at one street address stay apart
 
 ## [0.3.0] - 2026-10-31
 

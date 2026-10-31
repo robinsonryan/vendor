@@ -237,6 +237,54 @@ describe('RecordVendorContact, remit-to', function (): void {
         expect($vendor->addresses()->count())->toBe(1);
     });
 
+    it('reads a suite the same in one line or two', function (string $line1, ?string $line2): void {
+        $vendor = bareVendor();
+        Address::query()->create([
+            'party_id' => $vendor->party_id,
+            'purpose' => 'general',
+            'line1' => $line1,
+            'line2' => $line2,
+            'city' => 'Sandy',
+            'postal_code' => '84070',
+            'country_code' => 'US',
+        ]);
+
+        recordContact($vendor, 'remit_to', '123 Main St, Suite 4, Sandy, UT 84070');
+
+        expect($vendor->addresses()->count())->toBe(1);
+    })->with([
+        'two lines, the migrated layout' => ['123 Main St', 'Suite 4'],
+        'one line, the parsed layout' => ['123 Main St, Suite 4', null],
+    ]);
+
+    it('does not duplicate a suite the columns already put on the party', function (): void {
+        $vendor = Vendor::factory()->create([
+            'address_line_1' => '123 Main St',
+            'address_line_2' => 'Suite 4',
+            'city' => 'Sandy',
+            'state' => 'UT',
+            'postal_code' => '84070',
+        ]);
+
+        recordContact($vendor, 'remit_to', '123 Main St, Suite 4, Sandy, UT 84070');
+
+        expect($vendor->addresses()->count())->toBe(1);
+    });
+
+    it('keeps two suites at one street address apart', function (): void {
+        $vendor = Vendor::factory()->create([
+            'address_line_1' => '123 Main St',
+            'address_line_2' => 'Suite 4',
+            'city' => 'Sandy',
+            'state' => 'UT',
+            'postal_code' => '84070',
+        ]);
+
+        recordContact($vendor, 'remit_to', '123 Main St, Suite 5, Sandy, UT 84070');
+
+        expect($vendor->addresses()->count())->toBe(2);
+    });
+
     it('does not bring back or trip over a removed address', function (): void {
         $vendor = bareVendor();
         recordContact($vendor, 'remit_to', 'PO Box 1, Huntington Beach CA 92648');

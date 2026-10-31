@@ -71,12 +71,12 @@ final class RecordVendorContact
     private function recordRemitTo(Party $party, string $value, VendorDocument $source): void
     {
         $address = $this->parseAddress($value);
-        $key = $this->addressKey($address['line1'], $address['postal_code']);
+        $key = $this->addressKey($address['line1'], null, $address['postal_code']);
 
         $present = Address::withTrashed()
             ->where('party_id', $party->id)
             ->get()
-            ->contains(fn (Address $held): bool => $this->addressKey($held->line1, $held->postal_code) === $key);
+            ->contains(fn (Address $held): bool => $this->addressKey($held->line1, $held->line2, $held->postal_code) === $key);
 
         if ($present) {
             return;
@@ -126,14 +126,15 @@ final class RecordVendorContact
     }
 
     /**
-     * Line one without punctuation, so `P.O. Box 1` and `PO BOX 1` agree, plus
-     * the five-digit postal code, so ZIP+4 agrees with ZIP.
+     * Both street lines read as one and without punctuation, so `P.O. Box 1` and
+     * `PO BOX 1` agree, and so does a suite on line two with one the parser left
+     * on line one. Then the five-digit postal code, so ZIP+4 agrees with ZIP.
      */
-    private function addressKey(string $line1, ?string $postalCode): string
+    private function addressKey(string $line1, ?string $line2, ?string $postalCode): string
     {
-        $bareLine = (string) preg_replace('/[^\p{L}\p{N}\s]/u', '', $line1);
+        $bareStreet = (string) preg_replace('/[^\p{L}\p{N}\s]/u', '', $line1.' '.$line2);
 
-        return VendorPartNumber::normalize($bareLine).'|'.substr(trim((string) $postalCode), 0, 5);
+        return VendorPartNumber::normalize($bareStreet).'|'.substr(trim((string) $postalCode), 0, 5);
     }
 
     private function recordAccountNumber(Vendor $vendor, string $value, VendorDocument $source): void

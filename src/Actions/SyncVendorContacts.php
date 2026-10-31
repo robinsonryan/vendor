@@ -97,7 +97,7 @@ final class SyncVendorContacts
     private function syncAddress(Party $party, Vendor $vendor): void
     {
         $held = array_filter(
-            [$vendor->address_line_1, $vendor->address_line_2, $vendor->city, $vendor->state, $vendor->postal_code],
+            [$vendor->address_line_1, $vendor->address_line_2, $vendor->city, $vendor->state, $vendor->postal_code, $vendor->country],
             fn (?string $value): bool => trim((string) $value) !== '',
         );
 

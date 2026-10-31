@@ -198,6 +198,7 @@ describe('contact details on the party', function (): void {
             'city' => null,
             'state' => null,
             'postal_code' => null,
+            'country' => '  ',
         ]);
 
         expect($vendor->contactPoints()->count())->toBe(0)
@@ -474,6 +475,30 @@ describe('copying the contact columns to parties', function (): void {
             ->and($address->city)->toBe('Sandy')
             ->and($address->country_code)->toBe('US');
     });
+
+    it('keeps a country that is the only address field, across reruns', function (string $country, string $code, array $metadata): void {
+        $vendor = Vendor::factory()->createQuietly([
+            'address_line_1' => null,
+            'city' => null,
+            'state' => null,
+            'postal_code' => null,
+            'country' => $country,
+        ]);
+        $migration = loadMigration(COPY_CONTACTS);
+
+        $migration->up();
+        $migration->up();
+
+        $address = $vendor->fresh()->addresses()->sole();
+
+        expect($address->line1)->toBe('')
+            ->and($address->city)->toBe('')
+            ->and($address->country_code)->toBe($code)
+            ->and($address->metadata)->toBe($metadata);
+    })->with([
+        'code' => ['CA', 'CA', ['source' => 'vendor_columns']],
+        'name' => ['Canada', 'US', ['source' => 'vendor_columns', 'country' => 'Canada']],
+    ]);
 
     it('turns a spelled-out country into a code and keeps what it read', function (string $country, string $code, array $metadata): void {
         $vendor = Vendor::factory()->createQuietly(['country' => $country]);

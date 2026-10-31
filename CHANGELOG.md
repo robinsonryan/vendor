@@ -12,6 +12,7 @@ On `0.x`, every minor release may break.
 - Changing a mirrored contact value no longer hands the old value's verification, consent or delivery status to the new one. `SyncVendorContacts` retires the old contact point (soft-deleted, keeping its verification events and consents) and writes a new row; naming the old value again restores it. A mirrored address whose location changes goes back to `unverified` and loses its geocode
 - `PostVendorDocument` takes a transaction-scoped PostgreSQL advisory lock on (source, source ref), so two simultaneous first posts of one document no longer fail on the unique index: the second waits, then compares versions
 - A vendor whose only address field is `country` now gets a party address, so `copy_vendor_contacts_to_parties` and the sync no longer leave that value only in a column the held drop destroys. **Upgrade note:** the copy is safe to rerun, so a 0.3.0 install can run `SyncVendorContacts` to pick up such a vendor
+- `VendorItem` stores the normalized part number on every model write, through a mutator rather than in `ResolveVendorItem` alone, so `pr60-asf` can no longer sit beside `PR60-ASF` for one vendor. The `desc:` prefix of a description key is kept. New `VendorPartNumber::key()`. The unique index is unchanged, so a query-builder write still has to pass a normalized key
 
 ## [0.3.0] - 2026-10-31
 

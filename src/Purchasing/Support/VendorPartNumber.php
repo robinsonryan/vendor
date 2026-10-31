@@ -10,6 +10,8 @@ namespace RobinsonRyan\Vendor\Purchasing\Support;
  */
 final class VendorPartNumber
 {
+    private const DESCRIPTION_PREFIX = 'desc:';
+
     public static function normalize(string $partNumber): string
     {
         return mb_strtoupper((string) preg_replace('/\s+/u', ' ', trim($partNumber)));
@@ -17,6 +19,20 @@ final class VendorPartNumber
 
     public static function forDescription(string $description): string
     {
-        return 'desc:'.self::normalize($description);
+        return self::DESCRIPTION_PREFIX.self::normalize($description);
+    }
+
+    /**
+     * The stored form of a key that is already one or the other. The prefix is
+     * matched in lower case because normalize() upper-cases everything else, so
+     * a printed `DESC:12` stays a part number.
+     */
+    public static function key(string $key): string
+    {
+        $key = trim($key);
+
+        return str_starts_with($key, self::DESCRIPTION_PREFIX)
+            ? self::forDescription(substr($key, strlen(self::DESCRIPTION_PREFIX)))
+            : self::normalize($key);
     }
 }

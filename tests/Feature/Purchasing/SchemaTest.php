@@ -7,6 +7,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use RobinsonRyan\Vendor\Models\Vendor;
+use RobinsonRyan\Vendor\Purchasing\Actions\ResolveVendorItem;
 use RobinsonRyan\Vendor\Purchasing\Enums\DocumentKind;
 use RobinsonRyan\Vendor\Purchasing\Enums\DocumentSource;
 use RobinsonRyan\Vendor\Purchasing\Enums\DocumentStatus;
@@ -159,6 +160,64 @@ describe('vendor_items', function (): void {
         ]));
     });
 
+    it('stores the normalized key however the model is written', function (Closure $write): void {
+        $vendor = Vendor::factory()->create();
+
+        expect($write($vendor)->fresh()->vendor_part_number)->toBe('PR60-ASF');
+    })->with([
+        'create' => [fn (Vendor $vendor): VendorItem => VendorItem::query()->create([
+            'vendor_id' => $vendor->id,
+            'vendor_part_number' => ' pr60-asf ',
+        ])],
+        'update' => [function (Vendor $vendor): VendorItem {
+            $item = VendorItem::factory()->create(['vendor_id' => $vendor->id]);
+            $item->update(['vendor_part_number' => 'pr60-asf']);
+
+            return $item;
+        }],
+        'assignment' => [function (Vendor $vendor): VendorItem {
+            $item = VendorItem::factory()->create(['vendor_id' => $vendor->id]);
+            $item->vendor_part_number = 'pr60-asf';
+            $item->save();
+
+            return $item;
+        }],
+        'updateOrCreate' => [fn (Vendor $vendor): VendorItem => VendorItem::query()->updateOrCreate(
+            ['vendor_id' => $vendor->id, 'vendor_part_number' => 'pr60-asf'],
+            ['description' => 'Axle shaft'],
+        )],
+        'no model events' => [fn (Vendor $vendor): VendorItem => VendorItem::factory()->createQuietly([
+            'vendor_id' => $vendor->id,
+            'vendor_part_number' => 'pr60-asf',
+        ])],
+    ]);
+
+    it('keeps the description prefix of a description key', function (): void {
+        $item = VendorItem::factory()->create(['vendor_part_number' => 'desc:Grade 8  bolt kit']);
+
+        expect($item->fresh()->vendor_part_number)->toBe('desc:GRADE 8 BOLT KIT');
+    });
+
+    it('refuses a second spelling of a part number', function (): void {
+        $vendor = Vendor::factory()->create();
+        VendorItem::factory()->create(['vendor_id' => $vendor->id, 'vendor_part_number' => 'PR60-ASF']);
+
+        expectConstraintViolation(fn (): VendorItem => VendorItem::factory()->create([
+            'vendor_id' => $vendor->id,
+            'vendor_part_number' => 'pr60-asf',
+        ]));
+    });
+
+    it('is the item the next invoice line resolves to', function (): void {
+        $vendor = Vendor::factory()->create();
+        $item = VendorItem::query()->create(['vendor_id' => $vendor->id, 'vendor_part_number' => 'pr60-asf']);
+
+        $resolved = (new ResolveVendorItem)->execute($vendor, 'PR60-ASF', 'Axle shaft');
+
+        expect($resolved->id)->toBe($item->id)
+            ->and(VendorItem::query()->count())->toBe(1);
+    });
+
     it('lets two vendors share a part number', function (): void {
         VendorItem::factory()->create(['vendor_part_number' => 'PR60-ASF']);
         $second = VendorItem::factory()->create(['vendor_part_number' => 'PR60-ASF']);
@@ -167,7 +226,7 @@ describe('vendor_items', function (): void {
     });
 
     it('holds a description key longer than a varchar', function (): void {
-        $key = 'desc:'.str_repeat('LONG DESCRIPTION ', 30);
+        $key = 'desc:'.trim(str_repeat('LONG DESCRIPTION ', 30));
 
         $item = VendorItem::factory()->create(['vendor_part_number' => $key]);
 

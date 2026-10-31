@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace RobinsonRyan\Vendor\Purchasing\Models;
 
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -13,6 +14,7 @@ use RobinsonRyan\Vendor\Concerns\BelongsToVendor;
 use RobinsonRyan\Vendor\Concerns\HasUuidPrimaryKey;
 use RobinsonRyan\Vendor\Database\Factories\VendorItemFactory;
 use RobinsonRyan\Vendor\Models\Vendor;
+use RobinsonRyan\Vendor\Purchasing\Support\VendorPartNumber;
 
 /**
  * @property string $id
@@ -67,6 +69,18 @@ final class VendorItem extends Model
         $model = config('vendor.models.purchase_line', PurchaseLine::class);
 
         return $this->hasMany($model, 'vendor_item_id');
+    }
+
+    /**
+     * The unique index compares the stored string, so the stored string has to
+     * be the normalized key on every write. A mutator rather than a `saving`
+     * hook, because a quiet save skips the hook and still sets the attribute.
+     *
+     * @return Attribute<never, string|null>
+     */
+    protected function vendorPartNumber(): Attribute
+    {
+        return Attribute::set(fn (?string $value): ?string => $value === null ? null : VendorPartNumber::key($value));
     }
 
     protected static function newFactory(): VendorItemFactory

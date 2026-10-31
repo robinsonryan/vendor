@@ -8,6 +8,21 @@ On `0.x`, every minor release may break.
 
 ## [Unreleased]
 
+### Added
+- **Purchasing record.** New `vendor_documents`, `purchase_lines` and `vendor_items` tables with models, factories and enums under `RobinsonRyan\Vendor\Purchasing`. Keys are database-generated UUID v7; table names and models come from `config('vendor.tables.*')` and `config('vendor.models.*')`
+- `PostVendorDocument`: the idempotent write of a vendor document, keyed on (source, source ref). A repeat or older version writes nothing; a newer version replaces the header and lines and never deletes a vendor item. Each touched vendor item's last price and last seen date are recomputed from its newest-dated line, so posting out of date order cannot regress them
+- `ResolveVendor` (paperless correspondent id, then case-insensitive exact name, else create) and `ResolveVendorItem` (normalized part number, or a `desc:` key built from the description when none is printed)
+- `RecordVendorContact`: adds a remit-to address, phone, AP email or sales rep read off a document to the vendor's party with its source document, without duplicates. AFWD's account number goes on `metadata.account_number`, is never overwritten, and a differing value lands in `metadata.account_number_seen`
+- **Vendors are hey-you organizations.** `Vendor` uses hey-you's `Contactable`, so a new vendor gets a party, recorded in the new nullable `vendors.party_id`. `primaryEmail()`, `primaryPhone()` and `primaryAddress()` read from the party; `ensureParty()` and `isStockVendor()` are new
+- Data migration `copy_vendor_contacts_to_parties`: gives every existing vendor a party and copies its contact columns into contact points and an address, marked `metadata.source = vendor_columns`. Additive and safe to rerun
+
+### Changed
+- Requires `robinsonryan/hey-you` `^0.2.2`, which in practice means Laravel 12 or 13. A consuming application's test case needs `HeyYouServiceProvider` registered, because creating a vendor now writes a party
+- Saving a vendor mirrors its contact columns onto its party through `SyncVendorContacts`. The sync hangs off the model rather than `CreateVendor`/`UpdateVendor`, so a direct model write cannot drift either
+
+### Held
+- The contact columns stay on `vendors` in this release, because the shop app still reads them. The migration that drops them is prepared but held at `database/migrations-held/2026_12_01_000000_drop_vendor_contact_columns.php`: it is outside `database/migrations`, not published and not run, and its docblock names exactly the data it destroys. It ships in a later release, only on an explicit yes, under the destructive-migration rule, once the shop app has stopped reading those columns.
+
 ## [0.2.0] - 2026-09-15
 
 ### Changed

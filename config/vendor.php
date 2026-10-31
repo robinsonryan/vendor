@@ -2,6 +2,9 @@
 
 declare(strict_types=1);
 use RobinsonRyan\Vendor\Models\Vendor;
+use RobinsonRyan\Vendor\Purchasing\Models\PurchaseLine;
+use RobinsonRyan\Vendor\Purchasing\Models\VendorDocument;
+use RobinsonRyan\Vendor\Purchasing\Models\VendorItem;
 
 return [
     /*
@@ -14,6 +17,9 @@ return [
     */
     'tables' => [
         'vendors' => 'vendors',
+        'vendor_documents' => 'vendor_documents',
+        'purchase_lines' => 'purchase_lines',
+        'vendor_items' => 'vendor_items',
     ],
 
     /*
@@ -51,5 +57,8 @@ return [
     */
     'models' => [
         'vendor' => Vendor::class,
+        'vendor_document' => VendorDocument::class,
+        'purchase_line' => PurchaseLine::class,
+        'vendor_item' => VendorItem::class,
     ],
 ];

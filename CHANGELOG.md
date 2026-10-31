@@ -8,6 +8,8 @@ On `0.x`, every minor release may break.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-31
+
 ### Added
 - **Purchasing record.** New `vendor_documents`, `purchase_lines` and `vendor_items` tables with models, factories and enums under `RobinsonRyan\Vendor\Purchasing`. Keys are database-generated UUID v7; table names and models come from `config('vendor.tables.*')` and `config('vendor.models.*')`
 - `PostVendorDocument`: the idempotent write of a vendor document, keyed on (source, source ref). A repeat or older version writes nothing; a newer version replaces the header and lines and never deletes a vendor item. Each touched vendor item's last price and last seen date are recomputed from its newest-dated line, so posting out of date order cannot regress them

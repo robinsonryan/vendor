@@ -8,6 +8,9 @@ On `0.x`, every minor release may break.
 
 ## [Unreleased]
 
+### Fixed
+- Changing a mirrored contact value no longer hands the old value's verification, consent or delivery status to the new one. `SyncVendorContacts` retires the old contact point (soft-deleted, keeping its verification events and consents) and writes a new row; naming the old value again restores it. A mirrored address whose location changes goes back to `unverified` and loses its geocode
+
 ## [0.3.0] - 2026-10-31
 
 ### Added

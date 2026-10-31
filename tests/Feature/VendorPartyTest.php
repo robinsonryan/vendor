@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\ServiceProvider;
 use RobinsonRyan\HeyYou\Models\Address;
 use RobinsonRyan\HeyYou\Models\ContactPoint;
+use RobinsonRyan\HeyYou\Models\ContactPointConsent;
 use RobinsonRyan\HeyYou\Models\Party;
 use RobinsonRyan\Vendor\Actions\CreateVendor;
 use RobinsonRyan\Vendor\Actions\SyncVendorContacts;
@@ -204,6 +205,141 @@ describe('contact details on the party', function (): void {
             ->and($vendor->primaryEmail())->toBeNull()
             ->and($vendor->primaryPhone())->toBeNull()
             ->and($vendor->primaryAddress())->toBeNull();
+    });
+});
+
+describe('a mirrored value that changes', function (): void {
+    /**
+     * @return array{Vendor, ContactPoint}
+     */
+    function vendorWithPoint(string $channel, string $column, string $value): array
+    {
+        $vendor = Vendor::factory()->create([$column => $value]);
+
+        return [$vendor, $vendor->contactPoints()->where('channel', $channel)->sole()];
+    }
+
+    it('does not hand the old value\'s verification to the new one', function (string $channel, string $column, string $old, string $new): void {
+        [$vendor, $point] = vendorWithPoint($channel, $column, $old);
+        $point->markVerified('link');
+
+        $vendor->update([$column => $new]);
+
+        $current = $vendor->contactPoints()->where('channel', $channel)->sole();
+
+        expect($current->value_raw)->toBe($new)
+            ->and($current->id)->not->toBe($point->id)
+            ->and($current->is_primary)->toBeTrue()
+            ->and($current->isCurrentlyVerified())->toBeFalse()
+            ->and($current->verified_at)->toBeNull()
+            ->and($current->verification_method)->toBeNull()
+            ->and($current->verificationEvents()->count())->toBe(0);
+    })->with([
+        'email' => ['email', 'contact_email', 'old@dynatrac.example', 'new@dynatrac.example'],
+        'phone' => ['phone', 'contact_phone', '801-555-0100', '801-555-0199'],
+        'name' => ['name', 'contact_name', 'Pat Lee', 'Sam Ortiz'],
+    ]);
+
+    it('keeps the old value\'s history on the row it belongs to', function (): void {
+        [$vendor, $point] = vendorWithPoint('email', 'contact_email', 'old@dynatrac.example');
+        $point->markVerified('link');
+        $consent = ContactPointConsent::query()->create([
+            'contact_point_id' => $point->id,
+            'purpose_category' => 'billing',
+            'status' => ContactPointConsent::STATUS_OPTED_IN,
+            'captured_at' => now(),
+            'source' => 'test',
+        ]);
+
+        $vendor->update(['contact_email' => 'new@dynatrac.example']);
+
+        $retired = ContactPoint::onlyTrashed()->where('channel', 'email')->sole();
+        $current = $vendor->contactPoints()->where('channel', 'email')->sole();
+
+        expect($retired->id)->toBe($point->id)
+            ->and($retired->value_raw)->toBe('old@dynatrac.example')
+            ->and($retired->is_primary)->toBeFalse()
+            ->and($retired->isCurrentlyVerified())->toBeTrue()
+            ->and($retired->verificationEvents()->count())->toBe(1)
+            ->and($consent->fresh()?->contact_point_id)->toBe($point->id)
+            ->and($current->consents()->count())->toBe(0);
+    });
+
+    it('does not hand a bounced status to the new value', function (): void {
+        [$vendor, $point] = vendorWithPoint('email', 'contact_email', 'old@dynatrac.example');
+        $point->update(['status' => ContactPoint::STATUS_BOUNCED]);
+
+        $vendor->update(['contact_email' => 'new@dynatrac.example']);
+
+        expect($vendor->fresh()->primaryEmail())->toBe('new@dynatrac.example');
+    });
+
+    it('keeps a label someone gave the mirrored point', function (): void {
+        [$vendor, $point] = vendorWithPoint('email', 'contact_email', 'old@dynatrac.example');
+        $point->update(['label' => 'Accounts']);
+
+        $vendor->update(['contact_email' => 'new@dynatrac.example']);
+
+        expect($vendor->contactPoints()->where('channel', 'email')->sole()->label)->toBe('Accounts');
+    });
+
+    it('gets the verification back with the value', function (): void {
+        [$vendor, $point] = vendorWithPoint('email', 'contact_email', 'old@dynatrac.example');
+        $point->markVerified('link');
+
+        $vendor->update(['contact_email' => 'new@dynatrac.example']);
+        $vendor->update(['contact_email' => 'old@dynatrac.example']);
+
+        $current = $vendor->contactPoints()->where('channel', 'email')->sole();
+
+        expect($current->id)->toBe($point->id)
+            ->and($current->is_primary)->toBeTrue()
+            ->and($current->isCurrentlyVerified())->toBeTrue()
+            ->and(ContactPoint::onlyTrashed()->where('channel', 'email')->sole()->value_raw)->toBe('new@dynatrac.example');
+    });
+
+    it('stays verified when only the spelling changes', function (): void {
+        [$vendor, $point] = vendorWithPoint('email', 'contact_email', 'ar@dynatrac.example');
+        $point->markVerified('link');
+
+        $vendor->update(['contact_email' => 'AR@Dynatrac.example']);
+
+        $current = $vendor->contactPoints()->where('channel', 'email')->sole();
+
+        expect($current->id)->toBe($point->id)
+            ->and($current->isCurrentlyVerified())->toBeTrue();
+    });
+
+    it('stops vouching for an address that moved', function (string $column, string $value): void {
+        $vendor = Vendor::factory()->create();
+        $vendor->addresses()->sole()->update([
+            'validation_status' => Address::STATUS_VERIFIED,
+            'geocode' => ['lat' => 40.57, 'lng' => -111.88],
+        ]);
+
+        $vendor->update([$column => $value]);
+
+        $address = $vendor->addresses()->sole();
+
+        expect($address->validation_status)->toBe(Address::STATUS_UNVERIFIED)
+            ->and($address->geocode)->toBeNull();
+    })->with([
+        'line one' => ['address_line_1', '500 State St'],
+        'line two' => ['address_line_2', 'Suite 9'],
+        'city' => ['city', 'Draper'],
+        'state' => ['state', 'NV'],
+        'postal code' => ['postal_code', '84020'],
+        'country' => ['country', 'CA'],
+    ]);
+
+    it('keeps vouching for an address that did not move', function (): void {
+        $vendor = Vendor::factory()->create(['country' => 'United States']);
+        $vendor->addresses()->sole()->update(['validation_status' => Address::STATUS_VERIFIED]);
+
+        $vendor->update(['contact_phone' => '801-555-0199', 'country' => 'USA']);
+
+        expect($vendor->addresses()->sole()->validation_status)->toBe(Address::STATUS_VERIFIED)
+            ->and($vendor->addresses()->sole()->metadata['country'])->toBe('USA');
     });
 });
 

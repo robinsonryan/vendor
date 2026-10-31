@@ -24,6 +24,14 @@ final class SyncVendorContacts
 {
     private const SOURCE = 'vendor_columns';
 
+    /**
+     * What an address's validation vouches for. The purpose, label and metadata
+     * can change without the place changing.
+     *
+     * @var list<string>
+     */
+    private const ADDRESS_LOCATION = ['line1', 'line2', 'city', 'region', 'postal_code', 'country_code'];
+
     public function execute(Vendor $vendor): void
     {
         $party = $vendor->ensureParty();
@@ -35,8 +43,11 @@ final class SyncVendorContacts
     }
 
     /**
-     * One mirrored point per channel. The unique index covers soft-deleted rows,
-     * so a value already held anywhere on the party is promoted, never inserted.
+     * One mirrored point per channel. A row stands for its value: verification,
+     * consent and delivery status belong to that value, so a new value gets a new
+     * row and the old row is retired with its history intact. The unique index
+     * covers soft-deleted rows, so a value already held anywhere on the party is
+     * promoted, never inserted.
      */
     private function syncPoint(Party $party, string $channel, ?string $value, ?string $label): void
     {
@@ -59,19 +70,16 @@ final class SyncVendorContacts
             fn (ContactPoint $point): bool => ! $point->trashed() && ($point->metadata['source'] ?? null) === self::SOURCE
         );
 
-        $point = $match ?? $mirror ?? new ContactPoint([
+        $point = $match ?? new ContactPoint([
             'party_id' => $party->id,
             'channel' => $channel,
-            'label' => $label,
+            'value_raw' => $value,
+            'label' => $mirror->label ?? $label,
             'metadata' => ['source' => self::SOURCE],
         ]);
 
-        if ($match !== null && $mirror !== null && ! $mirror->is($match)) {
+        if ($mirror !== null && ! $mirror->is($point)) {
             $mirror->delete();
-        }
-
-        if ($match === null) {
-            $point->value_raw = $value;
         }
 
         $point->is_primary = true;
@@ -111,6 +119,11 @@ final class SyncVendorContacts
             'country_code' => $this->countryCode($vendor->country),
             'metadata' => $this->addressMetadata($vendor->country),
         ]);
+
+        if ($address->isDirty(self::ADDRESS_LOCATION)) {
+            $address->validation_status = Address::STATUS_UNVERIFIED;
+            $address->geocode = null;
+        }
 
         if (! $address->exists || $address->isDirty()) {
             $address->save();

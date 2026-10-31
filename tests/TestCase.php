@@ -6,6 +6,7 @@ namespace RobinsonRyan\Vendor\Tests;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Orchestra\Testbench\TestCase as Orchestra;
+use RobinsonRyan\HeyYou\HeyYouServiceProvider;
 use RobinsonRyan\Taxon\TaxonServiceProvider;
 use RobinsonRyan\Vendor\VendorServiceProvider;
 
@@ -16,6 +17,7 @@ abstract class TestCase extends Orchestra
     protected function getPackageProviders($app): array
     {
         return [
+            HeyYouServiceProvider::class,
             TaxonServiceProvider::class,
             VendorServiceProvider::class,
         ];

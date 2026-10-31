@@ -16,6 +16,10 @@
     "repositories": [
         {
             "type": "vcs",
+            "url": "https://github.com/robinsonryan/hey-you.git"
+        },
+        {
+            "type": "vcs",
             "url": "https://github.com/robinsonryan/taxon.git"
         }
     ],
@@ -24,6 +28,7 @@
         "illuminate/contracts": "^11.0|^12.0|^13.0",
         "illuminate/database": "^11.0|^12.0|^13.0",
         "illuminate/support": "^11.0|^12.0|^13.0",
+        "robinsonryan/hey-you": "^0.2.2",
         "robinsonryan/taxon": "^0.6.0"
     },
     "require-dev": {

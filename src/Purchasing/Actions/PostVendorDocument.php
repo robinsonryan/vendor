@@ -24,6 +24,11 @@ use RobinsonRyan\Vendor\Purchasing\Models\VendorItem;
  * The same version, or an older one, writes nothing at all: not even the vendor
  * is resolved. A newer version replaces the header and every line, and a vendor
  * item is never deleted, because matches hang off it.
+ *
+ * Posts of one document run one at a time. The row lock alone cannot do that for
+ * a first post, which has no row to lock, so a rival's insert would hit the
+ * unique index and throw rather than compare versions. The lock is on a hash of
+ * the key: a collision only makes two documents wait for each other.
  */
 final readonly class PostVendorDocument
 {
@@ -35,6 +40,8 @@ final readonly class PostVendorDocument
     public function execute(VendorDocumentData $data): PostOutcome
     {
         return DB::transaction(function () use ($data): PostOutcome {
+            DB::select('select pg_advisory_xact_lock(hashtextextended(?, 0))', [$data->source->value.'|'.$data->sourceRef]);
+
             /** @var class-string<VendorDocument> $model */
             $model = config('vendor.models.vendor_document', VendorDocument::class);
 

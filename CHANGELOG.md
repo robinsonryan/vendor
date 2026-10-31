@@ -10,6 +10,7 @@ On `0.x`, every minor release may break.
 
 ### Fixed
 - Changing a mirrored contact value no longer hands the old value's verification, consent or delivery status to the new one. `SyncVendorContacts` retires the old contact point (soft-deleted, keeping its verification events and consents) and writes a new row; naming the old value again restores it. A mirrored address whose location changes goes back to `unverified` and loses its geocode
+- `PostVendorDocument` takes a transaction-scoped PostgreSQL advisory lock on (source, source ref), so two simultaneous first posts of one document no longer fail on the unique index: the second waits, then compares versions
 
 ## [0.3.0] - 2026-10-31
 

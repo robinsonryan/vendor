@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace RobinsonRyan\Vendor\Database\Factories;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
+use RobinsonRyan\Vendor\Actions\SyncVendorContacts;
+use RobinsonRyan\Vendor\Data\VendorContact;
 use RobinsonRyan\Vendor\Models\Vendor;
 
 /**
@@ -41,16 +43,27 @@ final class VendorFactory extends Factory
         return [
             'name' => $this->faker->company(),
             'code' => $this->faker->unique()->bothify('VND-####'),
-            'contact_name' => $this->faker->name(),
-            'contact_email' => $this->faker->companyEmail(),
-            'contact_phone' => $this->faker->phoneNumber(),
-            'address_line_1' => $this->faker->streetAddress(),
-            'city' => $this->faker->city(),
-            'state' => $this->faker->stateAbbr(),
-            'postal_code' => $this->faker->postcode(),
-            'country' => 'US',
             'website' => $this->faker->url(),
         ];
+    }
+
+    /**
+     * Sets a contact on the vendor's party: the one given, or a full made-up one.
+     */
+    public function withContact(?VendorContact $contact = null): self
+    {
+        return $this->afterCreating(function (Vendor $vendor) use ($contact): void {
+            (new SyncVendorContacts)->execute($vendor, $contact ?? new VendorContact(
+                name: $this->faker->name(),
+                email: $this->faker->companyEmail(),
+                phone: $this->faker->phoneNumber(),
+                line1: $this->faker->streetAddress(),
+                city: $this->faker->city(),
+                region: $this->faker->stateAbbr(),
+                postalCode: $this->faker->postcode(),
+                country: 'US',
+            ));
+        });
     }
 
     public function supplier(): self

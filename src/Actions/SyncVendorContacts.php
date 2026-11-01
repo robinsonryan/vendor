@@ -9,19 +9,23 @@ use RobinsonRyan\HeyYou\Contracts\Registries\NormalizerRegistry;
 use RobinsonRyan\HeyYou\Models\Address;
 use RobinsonRyan\HeyYou\Models\ContactPoint;
 use RobinsonRyan\HeyYou\Models\Party;
+use RobinsonRyan\Vendor\Data\VendorContact;
 use RobinsonRyan\Vendor\Models\Vendor;
 
 /**
- * Mirrors a vendor's contact columns onto its party, marking what it writes with
- * `metadata.source = vendor_columns`. The columns stay in this release because
- * the shop app still reads them; this is what stops the two drifting until the
- * held drop runs.
+ * Sets a vendor's contact on its party. This is the only writer of the party's
+ * primary rows: one point per channel and one address, which documents never
+ * touch, since RecordVendorContact adds its rows beside them.
  *
- * Idempotent: a vendor already in step writes nothing, so the data migration can
- * rerun. An empty column is left out rather than clearing the party.
+ * Idempotent: a contact already in step writes nothing. An empty value is left
+ * out rather than clearing the party.
  */
 final class SyncVendorContacts
 {
+    /**
+     * The mark on the rows this action owns. The name is where those rows first
+     * came from, and it stays because rows already carry it.
+     */
     private const SOURCE = 'vendor_columns';
 
     /**
@@ -32,18 +36,18 @@ final class SyncVendorContacts
      */
     private const ADDRESS_LOCATION = ['line1', 'line2', 'city', 'region', 'postal_code', 'country_code'];
 
-    public function execute(Vendor $vendor): void
+    public function execute(Vendor $vendor, VendorContact $contact): void
     {
         $party = $vendor->ensureParty();
 
-        $this->syncPoint($party, 'email', $vendor->contact_email, null);
-        $this->syncPoint($party, 'phone', $vendor->contact_phone, null);
-        $this->syncPoint($party, 'name', $vendor->contact_name, 'Contact');
-        $this->syncAddress($party, $vendor);
+        $this->syncPoint($party, 'email', $contact->email, null);
+        $this->syncPoint($party, 'phone', $contact->phone, null);
+        $this->syncPoint($party, 'name', $contact->name, 'Contact');
+        $this->syncAddress($party, $contact);
     }
 
     /**
-     * One mirrored point per channel. A row stands for its value: verification,
+     * One owned point per channel. A row stands for its value: verification,
      * consent and delivery status belong to that value, so a new value gets a new
      * row and the old row is retired with its history intact. The unique index
      * covers soft-deleted rows, so a value already held anywhere on the party is
@@ -94,31 +98,45 @@ final class SyncVendorContacts
             ->each(fn (ContactPoint $other): bool => $other->update(['is_primary' => false]));
     }
 
-    private function syncAddress(Party $party, Vendor $vendor): void
+    private function syncAddress(Party $party, VendorContact $contact): void
     {
-        $held = array_filter(
-            [$vendor->address_line_1, $vendor->address_line_2, $vendor->city, $vendor->state, $vendor->postal_code, $vendor->country],
+        $place = array_filter(
+            [
+                'line1' => $contact->line1,
+                'line2' => $contact->line2,
+                'city' => $contact->city,
+                'region' => $contact->region,
+                'postal_code' => $contact->postalCode,
+            ],
             fn (?string $value): bool => trim((string) $value) !== '',
         );
+        $country = trim((string) $contact->country);
 
-        if ($held === []) {
+        if ($place === [] && $country === '') {
             return;
         }
 
         $address = Address::query()
             ->where('party_id', $party->id)
             ->where('metadata->source', self::SOURCE)
-            ->first() ?? new Address(['party_id' => $party->id, 'purpose' => 'general', 'is_primary' => true]);
+            ->first() ?? new Address([
+                'party_id' => $party->id,
+                'purpose' => 'general',
+                'is_primary' => true,
+                'line1' => '',
+                'city' => '',
+                'country_code' => 'US',
+                'metadata' => ['source' => self::SOURCE],
+            ]);
 
-        $address->fill([
-            'line1' => (string) $vendor->address_line_1,
-            'line2' => $vendor->address_line_2,
-            'city' => (string) $vendor->city,
-            'region' => $vendor->state,
-            'postal_code' => $vendor->postal_code,
-            'country_code' => $this->countryCode($vendor->country),
-            'metadata' => $this->addressMetadata($vendor->country),
-        ]);
+        $address->fill($place);
+
+        if ($country !== '') {
+            $address->fill([
+                'country_code' => $this->countryCode($country),
+                'metadata' => $this->addressMetadata($country),
+            ]);
+        }
 
         if ($address->isDirty(self::ADDRESS_LOCATION)) {
             $address->validation_status = Address::STATUS_UNVERIFIED;
@@ -131,27 +149,23 @@ final class SyncVendorContacts
     }
 
     /**
-     * The column is free text and `country_code` is two letters and required.
+     * A country is free text and `country_code` is two letters and required.
      * AFWD's vendors are American, so that is the default for anything else.
      */
-    private function countryCode(?string $country): string
+    private function countryCode(string $country): string
     {
-        $country = trim((string) $country);
-
         return strlen($country) === 2 ? strtoupper($country) : 'US';
     }
 
     /**
-     * A country that does not fit the code keeps its wording, because the column
-     * it came from is going away.
+     * A country that does not fit the code keeps its wording, because the party
+     * holds the only copy.
      *
      * @return array{source: string, country?: string}
      */
-    private function addressMetadata(?string $country): array
+    private function addressMetadata(string $country): array
     {
-        $country = trim((string) $country);
-
-        if ($country === '' || strlen($country) === 2) {
+        if (strlen($country) === 2) {
             return ['source' => self::SOURCE];
         }
 

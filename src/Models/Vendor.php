@@ -12,8 +12,8 @@ use RobinsonRyan\HeyYou\Models\ContactPoint;
 use RobinsonRyan\HeyYou\Models\Party;
 use RobinsonRyan\HeyYou\Traits\Contactable;
 use RobinsonRyan\Taxon\HasTags;
-use RobinsonRyan\Vendor\Actions\SyncVendorContacts;
 use RobinsonRyan\Vendor\Concerns\HasUuidPrimaryKey;
+use RobinsonRyan\Vendor\Data\VendorContact;
 use RobinsonRyan\Vendor\Database\Factories\VendorFactory;
 use RobinsonRyan\Vendor\TagDefinitions\VendorStatusDefinition;
 use RobinsonRyan\Vendor\TagDefinitions\VendorTypeDefinition;
@@ -25,15 +25,6 @@ use RobinsonRyan\Vendor\TagDefinitions\VendorTypeDefinition;
  * @property string|null $code
  * @property string|null $type taxon tag attribute, see $tagAttributes
  * @property string|null $status taxon tag attribute, see $tagAttributes
- * @property string|null $contact_name
- * @property string|null $contact_email
- * @property string|null $contact_phone
- * @property string|null $address_line_1
- * @property string|null $address_line_2
- * @property string|null $city
- * @property string|null $state
- * @property string|null $postal_code
- * @property string|null $country
  * @property string|null $website
  * @property string|null $notes
  * @property array<string, mixed>|null $metadata
@@ -52,24 +43,6 @@ final class Vendor extends Model
     use HasTags;
     use HasUuidPrimaryKey;
 
-    /**
-     * The columns mirrored onto the party until the held drop runs, see
-     * SyncVendorContacts.
-     *
-     * @var list<string>
-     */
-    public const CONTACT_COLUMNS = [
-        'contact_name',
-        'contact_email',
-        'contact_phone',
-        'address_line_1',
-        'address_line_2',
-        'city',
-        'state',
-        'postal_code',
-        'country',
-    ];
-
     /** @var array<string, class-string> */
     protected array $tagAttributes = [
         'type' => VendorTypeDefinition::class,
@@ -80,15 +53,6 @@ final class Vendor extends Model
         'tenant_id',
         'name',
         'code',
-        'contact_name',
-        'contact_email',
-        'contact_phone',
-        'address_line_1',
-        'address_line_2',
-        'city',
-        'state',
-        'postal_code',
-        'country',
         'website',
         'notes',
         'metadata',
@@ -99,23 +63,13 @@ final class Vendor extends Model
     ];
 
     /**
-     * The sync sits on the model, not in CreateVendor and UpdateVendor, because
-     * the shop app writes vendors straight through the model and an action-only
-     * sync would let its edits drift.
-     *
      * Contactable's own `created` hook boots first, so the party exists by the
-     * time this one runs.
+     * time this one records it, however the vendor was written.
      */
     protected static function booted(): void
     {
         self::created(function (Vendor $vendor): void {
-            (new SyncVendorContacts)->execute($vendor);
-        });
-
-        self::updated(function (Vendor $vendor): void {
-            if ($vendor->wasChanged(self::CONTACT_COLUMNS)) {
-                (new SyncVendorContacts)->execute($vendor);
-            }
+            $vendor->ensureParty();
         });
     }
 
@@ -153,21 +107,44 @@ final class Vendor extends Model
 
     public function primaryEmail(): ?string
     {
-        return $this->primaryContactPoint('email')?->value_raw;
+        return $this->contactPoint('email', true)?->value_raw;
     }
 
     public function primaryPhone(): ?string
     {
-        return $this->primaryContactPoint('phone')?->value_raw;
+        return $this->contactPoint('phone', true)?->value_raw;
+    }
+
+    public function primaryContactName(): ?string
+    {
+        return $this->contactPoint('name', true)?->value_raw;
     }
 
     public function primaryAddress(): ?Address
     {
-        return $this->party?->addresses()
-            ->current()
-            ->orderByDesc('is_primary')
-            ->orderBy('id')
-            ->first();
+        return $this->address(true);
+    }
+
+    /**
+     * The contact a person set on this vendor, as SyncVendorContacts wrote it.
+     * Contacts read off documents join it only with `$fromDocuments`, so a caller
+     * has to choose to show them: they are the purchasing record's.
+     */
+    public function contact(bool $fromDocuments = false): VendorContact
+    {
+        $address = $this->address($fromDocuments);
+
+        return new VendorContact(
+            name: $this->contactPoint('name', $fromDocuments)?->value_raw,
+            email: $this->contactPoint('email', $fromDocuments)?->value_raw,
+            phone: $this->contactPoint('phone', $fromDocuments)?->value_raw,
+            line1: $address?->line1 === '' ? null : $address?->line1,
+            line2: $address?->line2,
+            city: $address?->city === '' ? null : $address?->city,
+            region: $address?->region,
+            postalCode: $address?->postal_code,
+            country: $address?->metadata['country'] ?? $address?->country_code,
+        );
     }
 
     /**
@@ -179,13 +156,29 @@ final class Vendor extends Model
         return ($this->metadata['stock_vendor'] ?? true) !== false;
     }
 
-    private function primaryContactPoint(string $channel): ?ContactPoint
+    /**
+     * Reads the party's rows through the relations rather than a query of its
+     * own, so eager loading `party.contactPoints` serves a whole page.
+     */
+    private function contactPoint(string $channel, bool $fromDocuments): ?ContactPoint
     {
-        return $this->party?->contactPoints()
+        return $this->party?->contactPoints
             ->where('channel', $channel)
             ->where('status', ContactPoint::STATUS_ACTIVE)
-            ->orderByDesc('is_primary')
-            ->orderBy('id')
+            ->when(! $fromDocuments, fn ($points) => $points->where('is_primary', true))
+            ->sortBy([['is_primary', 'desc'], ['id', 'asc']])
+            ->first();
+    }
+
+    /**
+     * Likewise for `party.addresses`, with hey-you's `current` scope read in PHP.
+     */
+    private function address(bool $fromDocuments): ?Address
+    {
+        return $this->party?->addresses
+            ->reject(fn (Address $address): bool => (bool) $address->valid_from?->isFuture() || (bool) $address->valid_to?->isPast())
+            ->when(! $fromDocuments, fn ($addresses) => $addresses->where('is_primary', true))
+            ->sortBy([['is_primary', 'desc'], ['id', 'asc']])
             ->first();
     }
 

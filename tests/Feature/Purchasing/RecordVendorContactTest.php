@@ -4,27 +4,19 @@ declare(strict_types=1);
 
 use RobinsonRyan\HeyYou\Models\Address;
 use RobinsonRyan\HeyYou\Models\ContactPoint;
+use RobinsonRyan\Vendor\Data\VendorContact;
 use RobinsonRyan\Vendor\Models\Vendor;
 use RobinsonRyan\Vendor\Purchasing\Actions\RecordVendorContact;
 use RobinsonRyan\Vendor\Purchasing\Data\VendorContactData;
 use RobinsonRyan\Vendor\Purchasing\Models\VendorDocument;
 
 /**
- * A vendor with no contact columns, so the only contact points in play are
- * the ones the test records.
+ * A vendor with no contact set, so the only contact points in play are the
+ * ones the test records.
  */
 function bareVendor(): Vendor
 {
-    return Vendor::factory()->create([
-        'contact_name' => null,
-        'contact_email' => null,
-        'contact_phone' => null,
-        'address_line_1' => null,
-        'city' => null,
-        'state' => null,
-        'postal_code' => null,
-        'country' => null,
-    ]);
+    return Vendor::factory()->create();
 }
 
 function recordContact(Vendor $vendor, string $kind, string $value, ?VendorDocument $source = null): void
@@ -95,7 +87,7 @@ describe('RecordVendorContact, contact points', function (): void {
     ]);
 
     it('does not duplicate a value the columns already put on the party', function (): void {
-        $vendor = Vendor::factory()->create(['contact_email' => 'ar@dynatrac.example']);
+        $vendor = Vendor::factory()->withContact(new VendorContact(email: 'ar@dynatrac.example'))->create();
         $before = ContactPoint::query()->count();
 
         recordContact($vendor, 'ap_email', 'ar@dynatrac.example');
@@ -137,7 +129,7 @@ describe('RecordVendorContact, contact points', function (): void {
     });
 
     it('makes a party for a vendor that predates the link', function (): void {
-        $vendor = Vendor::factory()->createQuietly(['contact_email' => null]);
+        $vendor = Vendor::factory()->createQuietly();
 
         recordContact($vendor, 'phone', '801-555-0100');
 
@@ -224,13 +216,13 @@ describe('RecordVendorContact, remit-to', function (): void {
     });
 
     it('does not duplicate an address the columns already put on the party', function (): void {
-        $vendor = Vendor::factory()->create([
-            'address_line_1' => 'PO Box 1',
-            'city' => 'Huntington Beach',
-            'state' => 'CA',
-            'postal_code' => '92648',
-            'country' => 'US',
-        ]);
+        $vendor = Vendor::factory()->withContact(new VendorContact(
+            line1: 'PO Box 1',
+            city: 'Huntington Beach',
+            region: 'CA',
+            postalCode: '92648',
+            country: 'US',
+        ))->create();
 
         recordContact($vendor, 'remit_to', 'PO Box 1, Huntington Beach CA 92648');
 
@@ -257,14 +249,14 @@ describe('RecordVendorContact, remit-to', function (): void {
         'one line, the parsed layout' => ['123 Main St, Suite 4', null],
     ]);
 
-    it('does not duplicate a suite the columns already put on the party', function (): void {
-        $vendor = Vendor::factory()->create([
-            'address_line_1' => '123 Main St',
-            'address_line_2' => 'Suite 4',
-            'city' => 'Sandy',
-            'state' => 'UT',
-            'postal_code' => '84070',
-        ]);
+    it('does not duplicate a suite already set on the party', function (): void {
+        $vendor = Vendor::factory()->withContact(new VendorContact(
+            line1: '123 Main St',
+            line2: 'Suite 4',
+            city: 'Sandy',
+            region: 'UT',
+            postalCode: '84070',
+        ))->create();
 
         recordContact($vendor, 'remit_to', '123 Main St, Suite 4, Sandy, UT 84070');
 
@@ -272,13 +264,13 @@ describe('RecordVendorContact, remit-to', function (): void {
     });
 
     it('keeps two suites at one street address apart', function (): void {
-        $vendor = Vendor::factory()->create([
-            'address_line_1' => '123 Main St',
-            'address_line_2' => 'Suite 4',
-            'city' => 'Sandy',
-            'state' => 'UT',
-            'postal_code' => '84070',
-        ]);
+        $vendor = Vendor::factory()->withContact(new VendorContact(
+            line1: '123 Main St',
+            line2: 'Suite 4',
+            city: 'Sandy',
+            region: 'UT',
+            postalCode: '84070',
+        ))->create();
 
         recordContact($vendor, 'remit_to', '123 Main St, Suite 5, Sandy, UT 84070');
 

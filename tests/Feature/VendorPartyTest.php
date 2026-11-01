@@ -379,6 +379,361 @@ describe('a contact value that changes', function (): void {
     });
 });
 
+describe('a contact sent as a form\'s groups', function (): void {
+    /**
+     * @param  array<string, string|null>|null  $contact
+     * @param  array<string, string|null>|null  $address
+     */
+    function sendGroups(Vendor $vendor, ?array $contact, ?array $address): void
+    {
+        (new SyncVendorContacts)->execute($vendor, VendorContact::fromGroups($contact, $address));
+    }
+
+    function fullContact(): VendorContact
+    {
+        return new VendorContact(
+            name: 'Pat Lee',
+            email: 'old@example.com',
+            phone: '801-555-0100',
+            line1: '123 Main St',
+            line2: 'Suite 4',
+            city: 'Sandy',
+            region: 'UT',
+            postalCode: '84070',
+            country: 'CA',
+        );
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    function emptyAddress(): array
+    {
+        return ['line1' => '', 'line2' => '', 'city' => '', 'region' => '', 'postal_code' => '', 'country' => ''];
+    }
+
+    function documentPoint(Vendor $vendor, string $channel, string $value): ContactPoint
+    {
+        return ContactPoint::query()->create([
+            'party_id' => $vendor->party_id,
+            'channel' => $channel,
+            'value_raw' => $value,
+            'metadata' => ['source' => 'document'],
+        ]);
+    }
+
+    function documentAddress(Vendor $vendor): Address
+    {
+        return Address::query()->create([
+            'party_id' => $vendor->party_id,
+            'purpose' => 'billing',
+            'line1' => 'PO Box 1',
+            'city' => 'Sandy',
+            'country_code' => 'US',
+            'metadata' => ['source' => 'document'],
+        ]);
+    }
+
+    it('becomes what was sent, with the emptied fields cleared and the street moved', function (): void {
+        $vendor = Vendor::factory()->withContact(fullContact())->create();
+
+        sendGroups(
+            $vendor,
+            ['name' => 'Pat Lee', 'email' => '', 'phone' => ''],
+            ['line1' => '500 State St', 'line2' => '', 'city' => 'Sandy', 'region' => 'UT', 'postal_code' => '', 'country' => 'CA'],
+        );
+
+        expect($vendor->fresh()->contact())->toEqual(new VendorContact(
+            name: 'Pat Lee',
+            line1: '500 State St',
+            city: 'Sandy',
+            region: 'UT',
+            country: 'CA',
+        ));
+    });
+
+    it('clears a point whatever empty looks like', function (string $channel, mixed $empty): void {
+        $vendor = Vendor::factory()->withContact(fullContact())->create();
+
+        sendGroups($vendor, [$channel => $empty], null);
+
+        expect($vendor->contactPoints()->where('channel', $channel)->count())->toBe(0)
+            ->and($vendor->contactPoints()->count())->toBe(2)
+            ->and($vendor->fresh()->contact()->{$channel})->toBeNull();
+    })->with(['email', 'phone', 'name'])->with([
+        'an empty string' => [''],
+        'spaces' => ['   '],
+        'null' => [null],
+    ]);
+
+    it('retires a cleared point with its history, and brings it back when named again', function (): void {
+        $vendor = Vendor::factory()->withContact(new VendorContact(email: 'old@example.com'))->create();
+        $point = $vendor->contactPoints()->sole();
+        $point->markVerified('link');
+
+        sendGroups($vendor, ['email' => ''], null);
+
+        $retired = ContactPoint::onlyTrashed()->sole();
+
+        expect($retired->id)->toBe($point->id)
+            ->and($retired->is_primary)->toBeFalse()
+            ->and($retired->verificationEvents()->count())->toBe(1);
+
+        sendGroups($vendor, ['email' => 'old@example.com'], null);
+
+        $current = $vendor->contactPoints()->sole();
+
+        expect($current->id)->toBe($point->id)
+            ->and($current->is_primary)->toBeTrue()
+            ->and($current->isCurrentlyVerified())->toBeTrue()
+            ->and($vendor->fresh()->contact()->email)->toBe('old@example.com');
+    });
+
+    it('changes nothing for a group that was not sent', function (mixed $notSent): void {
+        $vendor = Vendor::factory()->withContact(fullContact())->create();
+
+        sendGroups($vendor, $notSent, $notSent);
+
+        expect($vendor->fresh()->contact())->toEqual(fullContact());
+    })->with(['null' => [null], 'an empty group' => [[]]]);
+
+    it('leaves the address when only the contact group is sent', function (): void {
+        $vendor = Vendor::factory()->withContact(fullContact())->create();
+
+        sendGroups($vendor, ['name' => '', 'email' => '', 'phone' => ''], null);
+
+        expect($vendor->fresh()->contact())->toEqual(new VendorContact(
+            line1: '123 Main St',
+            line2: 'Suite 4',
+            city: 'Sandy',
+            region: 'UT',
+            postalCode: '84070',
+            country: 'CA',
+        ));
+    });
+
+    it('leaves the points when only the address group is sent', function (): void {
+        $vendor = Vendor::factory()->withContact(fullContact())->create();
+
+        sendGroups($vendor, null, emptyAddress());
+
+        expect($vendor->fresh()->contact())->toEqual(new VendorContact(
+            name: 'Pat Lee',
+            email: 'old@example.com',
+            phone: '801-555-0100',
+        ));
+    });
+
+    it('leaves a field the contact group does not carry', function (): void {
+        $vendor = Vendor::factory()->withContact(fullContact())->create();
+
+        sendGroups($vendor, ['email' => 'new@example.com'], null);
+
+        expect($vendor->fresh()->contact())->toEqual(new VendorContact(
+            name: 'Pat Lee',
+            email: 'new@example.com',
+            phone: '801-555-0100',
+            line1: '123 Main St',
+            line2: 'Suite 4',
+            city: 'Sandy',
+            region: 'UT',
+            postalCode: '84070',
+            country: 'CA',
+        ));
+    });
+
+    it('replaces the address as a whole, fields it leaves out included', function (): void {
+        $vendor = Vendor::factory()->withContact(fullContact())->create();
+        $address = $vendor->addresses()->sole();
+
+        sendGroups($vendor, null, ['line1' => '500 State St', 'city' => 'Draper']);
+
+        $moved = $vendor->addresses()->sole();
+
+        expect($moved->id)->toBe($address->id)
+            ->and($moved->is_primary)->toBeTrue()
+            ->and($moved->line1)->toBe('500 State St')
+            ->and($moved->line2)->toBeNull()
+            ->and($moved->city)->toBe('Draper')
+            ->and($moved->region)->toBeNull()
+            ->and($moved->postal_code)->toBeNull();
+    });
+
+    it('stops vouching for an address that lost a field', function (string $kept): void {
+        $vendor = Vendor::factory()->withContact(fullContact())->create();
+        $vendor->addresses()->sole()->update([
+            'validation_status' => Address::STATUS_VERIFIED,
+            'geocode' => ['lat' => 40.57, 'lng' => -111.88],
+        ]);
+
+        sendGroups($vendor, null, [
+            'line1' => '123 Main St',
+            'line2' => 'Suite 4',
+            'city' => 'Sandy',
+            'region' => 'UT',
+            'postal_code' => '84070',
+            'country' => 'CA',
+            $kept => '',
+        ]);
+
+        $address = $vendor->addresses()->sole();
+
+        expect($address->validation_status)->toBe(Address::STATUS_UNVERIFIED)
+            ->and($address->geocode)->toBeNull();
+    })->with(['line1', 'line2', 'city', 'region', 'postal_code', 'country']);
+
+    it('falls back to the default code when the country is cleared, and forgets its wording', function (string $country): void {
+        $vendor = Vendor::factory()->withContact(new VendorContact(line1: '123 Main St', city: 'Sandy', country: $country))->create();
+
+        sendGroups($vendor, null, ['line1' => '123 Main St', 'city' => 'Sandy', 'country' => '']);
+
+        $address = $vendor->addresses()->sole();
+
+        expect($address->country_code)->toBe('US')
+            ->and($address->metadata)->toBe(['source' => 'vendor_columns']);
+    })->with(['a code' => ['CA'], 'a wording' => ['Canada']]);
+
+    it('keeps an address that only a country is left of', function (): void {
+        $vendor = Vendor::factory()->withContact(fullContact())->create();
+
+        sendGroups($vendor, null, ['country' => 'CA']);
+
+        expect($vendor->fresh()->contact())->toEqual(new VendorContact(
+            name: 'Pat Lee',
+            email: 'old@example.com',
+            phone: '801-555-0100',
+            country: 'CA',
+        ));
+    });
+
+    it('retires an address cleared entirely, and takes a new one afterwards', function (): void {
+        $vendor = Vendor::factory()->withContact(fullContact())->create();
+        $address = $vendor->addresses()->sole();
+
+        sendGroups($vendor, null, emptyAddress());
+
+        $retired = Address::onlyTrashed()->sole();
+
+        expect($retired->id)->toBe($address->id)
+            ->and($retired->is_primary)->toBeFalse()
+            ->and($retired->line1)->toBe('123 Main St')
+            ->and($vendor->addresses()->count())->toBe(0)
+            ->and($vendor->fresh()->contact()->line1)->toBeNull()
+            ->and($vendor->fresh()->primaryAddress())->toBeNull();
+
+        sendGroups($vendor, null, ['line1' => '500 State St', 'city' => 'Draper']);
+
+        expect($vendor->addresses()->sole()->is_primary)->toBeTrue()
+            ->and($vendor->addresses()->sole()->id)->not->toBe($address->id)
+            ->and($vendor->fresh()->contact()->line1)->toBe('500 State St');
+    });
+
+    it('does not touch what documents added', function (): void {
+        $vendor = Vendor::factory()->withContact(fullContact())->create();
+        $phone = documentPoint($vendor, 'phone', '801-555-0101');
+        $email = documentPoint($vendor, 'email', 'ar@example.com');
+        $remitTo = documentAddress($vendor);
+        $before = [$phone->fresh()->getAttributes(), $email->fresh()->getAttributes(), $remitTo->fresh()->getAttributes()];
+
+        sendGroups($vendor, ['name' => '', 'email' => '', 'phone' => ''], emptyAddress());
+
+        $fresh = $vendor->fresh();
+
+        expect([$phone->fresh()->getAttributes(), $email->fresh()->getAttributes(), $remitTo->fresh()->getAttributes()])->toBe($before)
+            ->and($fresh->contact())->toEqual(new VendorContact)
+            ->and($fresh->contact(fromDocuments: true)->phone)->toBe('801-555-0101')
+            ->and($fresh->contact(fromDocuments: true)->email)->toBe('ar@example.com')
+            ->and($fresh->contact(fromDocuments: true)->line1)->toBe('PO Box 1');
+    });
+
+    it('hands a promoted document point back to the documents rather than removing it', function (): void {
+        $vendor = Vendor::factory()->withContact(new VendorContact(email: 'old@example.com'))->create();
+        $point = documentPoint($vendor, 'email', 'ar@example.com');
+
+        (new SyncVendorContacts)->execute($vendor, new VendorContact(email: 'ar@example.com'));
+
+        expect($point->fresh()->is_primary)->toBeTrue()
+            ->and($vendor->fresh()->contact()->email)->toBe('ar@example.com');
+
+        sendGroups($vendor, ['email' => ''], null);
+
+        $kept = $point->fresh();
+
+        expect($kept->trashed())->toBeFalse()
+            ->and($kept->is_primary)->toBeFalse()
+            ->and($kept->metadata['source'])->toBe('document')
+            ->and($vendor->fresh()->contact()->email)->toBeNull()
+            ->and($vendor->fresh()->contact(fromDocuments: true)->email)->toBe('ar@example.com');
+    });
+
+    it('writes nothing when the same groups are sent again', function (): void {
+        $vendor = Vendor::factory()->withContact(fullContact())->create();
+        $contact = ['name' => 'Pat Lee', 'email' => '', 'phone' => ''];
+        $address = ['line1' => '500 State St', 'line2' => '', 'city' => 'Sandy', 'region' => '', 'postal_code' => '', 'country' => ''];
+
+        sendGroups($vendor, $contact, $address);
+
+        $stamps = ContactPoint::withTrashed()->orderBy('id')->pluck('updated_at')->all();
+        $addressStamp = $vendor->addresses()->sole()->updated_at;
+
+        sendGroups($vendor, $contact, $address);
+
+        expect(ContactPoint::withTrashed()->orderBy('id')->pluck('updated_at')->all())->toEqual($stamps)
+            ->and($vendor->addresses()->sole()->updated_at)->toEqual($addressStamp);
+    });
+
+    it('writes nothing for a vendor with no contact sent an empty form', function (): void {
+        $vendor = Vendor::factory()->create();
+
+        sendGroups($vendor, ['name' => '', 'email' => '', 'phone' => ''], emptyAddress());
+
+        expect(ContactPoint::withTrashed()->count())->toBe(0)
+            ->and(Address::withTrashed()->count())->toBe(0);
+    });
+
+    it('carries through UpdateVendor', function (): void {
+        $vendor = Vendor::factory()->withContact(fullContact())->create();
+
+        (new UpdateVendor)->execute($vendor, new VendorData(
+            name: 'Dynatrac',
+            contact: VendorContact::fromGroups(['email' => ''], ['line1' => '500 State St']),
+        ));
+
+        expect($vendor->fresh()->contact())->toEqual(new VendorContact(
+            name: 'Pat Lee',
+            phone: '801-555-0100',
+            line1: '500 State St',
+            country: 'US',
+        ));
+    });
+
+    it('keeps a value given for a field it was also told to clear', function (): void {
+        $vendor = Vendor::factory()->withContact(fullContact())->create();
+
+        (new SyncVendorContacts)->execute($vendor, new VendorContact(email: 'new@example.com', city: 'Draper', cleared: ['email', 'city']));
+
+        expect($vendor->fresh()->contact()->email)->toBe('new@example.com')
+            ->and($vendor->fresh()->contact()->city)->toBe('Draper');
+    });
+
+    it('clears only the fields it names', function (): void {
+        $vendor = Vendor::factory()->withContact(fullContact())->create();
+
+        (new SyncVendorContacts)->execute($vendor, new VendorContact(cleared: ['line2']));
+
+        expect($vendor->fresh()->contact())->toEqual(new VendorContact(
+            name: 'Pat Lee',
+            email: 'old@example.com',
+            phone: '801-555-0100',
+            line1: '123 Main St',
+            city: 'Sandy',
+            region: 'UT',
+            postalCode: '84070',
+            country: 'CA',
+        ));
+    });
+});
+
 describe('primary accessors', function (): void {
     it('falls back to a non-primary point', function (): void {
         $vendor = Vendor::factory()->create();

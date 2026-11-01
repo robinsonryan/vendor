@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use RobinsonRyan\Vendor\Actions\CreateVendor;
 use RobinsonRyan\Vendor\Actions\UpdateVendor;
+use RobinsonRyan\Vendor\Data\VendorContact;
 use RobinsonRyan\Vendor\Data\VendorData;
 use RobinsonRyan\Vendor\Models\Vendor;
 
@@ -89,25 +90,28 @@ describe('CreateVendor Action', function (): void {
             code: 'FULL-001',
             type: 'contractor',
             status: 'active',
-            contactName: 'John Doe',
-            contactEmail: 'john@example.com',
-            contactPhone: '555-1234',
-            addressLine1: '123 Main St',
-            city: 'Anytown',
-            state: 'CA',
-            postalCode: '12345',
-            country: 'US',
             website: 'https://example.com',
             notes: 'Test notes',
             metadata: ['custom' => 'data'],
+            contact: new VendorContact(
+                name: 'John Doe',
+                email: 'john@example.com',
+                phone: '555-1234',
+                line1: '123 Main St',
+                city: 'Anytown',
+                region: 'CA',
+                postalCode: '12345',
+                country: 'US',
+            ),
         );
 
         $action = new CreateVendor;
         $vendor = $action->execute($data);
 
-        expect($vendor->contact_name)->toBe('John Doe')
-            ->and($vendor->contact_email)->toBe('john@example.com')
-            ->and($vendor->city)->toBe('Anytown')
+        expect($vendor->primaryContactName())->toBe('John Doe')
+            ->and($vendor->primaryEmail())->toBe('john@example.com')
+            ->and($vendor->primaryAddress()?->city)->toBe('Anytown')
+            ->and($vendor->website)->toBe('https://example.com')
             ->and($vendor->metadata)->toBe(['custom' => 'data']);
     });
 });
@@ -139,25 +143,25 @@ describe('VendorData', function (): void {
             'name' => 'Array Vendor',
             'code' => 'ARR-001',
             'type' => 'supplier',
-            'contact_email' => 'test@example.com',
+            'contact' => ['email' => 'test@example.com', 'line1' => '123 Main St', 'postal_code' => '84070'],
         ]);
 
         expect($data->name)->toBe('Array Vendor')
             ->and($data->code)->toBe('ARR-001')
-            ->and($data->contactEmail)->toBe('test@example.com');
+            ->and($data->contact)->toEqual(new VendorContact(email: 'test@example.com', line1: '123 Main St', postalCode: '84070'));
     });
 
     it('can be converted to array', function (): void {
         $data = new VendorData(
             name: 'Test Vendor',
             code: 'TEST-001',
-            contactEmail: 'test@example.com',
+            contact: new VendorContact(email: 'test@example.com'),
         );
 
         $array = $data->toArray();
 
         expect($array)->toHaveKey('name', 'Test Vendor')
             ->and($array)->toHaveKey('code', 'TEST-001')
-            ->and($array)->toHaveKey('contact_email', 'test@example.com');
+            ->and($array)->not->toHaveKey('contact');
     });
 });

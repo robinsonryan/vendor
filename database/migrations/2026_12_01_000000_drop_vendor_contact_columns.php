@@ -7,20 +7,22 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * HELD. DESTRUCTIVE. Not published and not run: it sits outside
- * `database/migrations` on purpose, and moves in only on Ryan's explicit yes,
- * under the destructive-migration rule, with a fresh backup taken first.
- *
- * Destroys, for every row of the vendors table, the contents of these columns:
+ * DESTRUCTIVE. Destroys, for every row of the vendors table, the contents of these
+ * columns:
  *
  *   contact_name, contact_email, contact_phone,
  *   address_line_1, address_line_2, city, state, postal_code, country
  *
- * That data should already be on each vendor's hey-you party, copied there by
- * `2026_10_31_000005_copy_vendor_contacts_to_parties` and kept in step since by
- * SyncVendorContacts. Before running this, the shop app must have stopped reading
- * the columns, `Vendor`, `VendorData` and `SyncVendorContacts` must stop touching
- * them, and every vendor must be confirmed to have its party.
+ * That data is on each vendor's hey-you party, copied there by
+ * `2026_10_31_000005_copy_vendor_contacts_to_parties`, which runs first and reads
+ * the columns off the row. The party is the only copy from here on: `Vendor` and
+ * `VendorData` no longer hold these fields, and SyncVendorContacts writes the party
+ * directly. An application must have stopped reading the columns before it takes
+ * this migration.
+ *
+ * It falls under the destructive-migration rule wherever vendors exist: a fresh
+ * backup verified restorable, every vendor confirmed to have its party, and the
+ * owner's explicit yes for that database.
  *
  * `down()` puts the columns back empty. It cannot restore their contents.
  */

@@ -8,7 +8,9 @@ On `0.x`, every minor release may break.
 
 ## [Unreleased]
 
-## [0.4.0] - 2026-11-01
+## [0.4.1] - 2026-11-01
+
+The release 0.4.0 was meant to be. Take this one, not 0.4.0.
 
 ### Removed
 - **BREAKING, DESTRUCTIVE: the contact columns are gone from `vendors`.** New migration `drop_vendor_contact_columns`, published with the rest, drops `contact_name`, `contact_email`, `contact_phone`, `address_line_1`, `address_line_2`, `city`, `state`, `postal_code` and `country`, destroying their contents. It falls under the destructive-migration rule: a verified backup, every vendor confirmed to have its party, and the owner's explicit yes. `down()` puts the columns back empty and cannot restore their contents
@@ -16,12 +18,16 @@ On `0.x`, every minor release may break.
 
 ### Changed
 - **BREAKING:** `SyncVendorContacts::execute()` takes a new `RobinsonRyan\Vendor\Data\VendorContact` as its second argument, and `VendorData` carries one as `contact` for `CreateVendor` and `UpdateVendor` to pass on. An empty value still leaves the party alone
-- `copy_vendor_contacts_to_parties` reads the columns off the row itself and hands them to the sync, so a database that has not run it yet still gets its data copied before the drop. **Upgrade note:** an application that published the migration must take this version of it, or it fails on the new signature. On 0.x this is why the release is a minor: `^0.3` will not pick it up
+- `copy_vendor_contacts_to_parties` reads the columns off the row itself and hands them to the sync, so a database that has not run it yet still gets its data copied before the drop. **Upgrade note:** an application that published the migration must take this version of it, or it fails on the new signature. On 0.x this is why the release left the 0.3 line: `^0.3` will not pick it up
 - `primaryEmail()`, `primaryPhone()` and `primaryAddress()` read the party's rows through the relations, so eager loading `party.contactPoints` and `party.addresses` serves a whole page. They keep what they answer, and read a loaded relation rather than asking again
 
 ### Added
 - `Vendor::contact()` returns the contact a person set, the rows `SyncVendorContacts` owns, as a `VendorContact`. With `fromDocuments: true` it falls back to contacts read off documents, which are the purchasing record's, so showing them is the caller's choice
 - `Vendor::primaryContactName()`
+
+## [0.4.0] - 2026-11-01
+
+Tagged by mistake: the merge failed and the release went out without it. This tag holds the same code as 0.3.1 and only a changelog entry describing a change it does not contain. Do not consume it.
 
 ## [0.3.1] - 2026-10-31
 

@@ -17,8 +17,9 @@ use RobinsonRyan\Vendor\Models\Vendor;
  * primary rows: one point per channel and one address, which documents never
  * touch, since RecordVendorContact adds its rows beside them.
  *
- * Idempotent: a contact already in step writes nothing. An empty value is left
- * out rather than clearing the party.
+ * Idempotent: a contact already in step writes nothing. An empty value leaves
+ * its field as it is, and only a field the contact clears is emptied. What
+ * documents added stays either way.
  */
 final class SyncVendorContacts
 {
@@ -36,13 +37,21 @@ final class SyncVendorContacts
      */
     private const ADDRESS_LOCATION = ['line1', 'line2', 'city', 'region', 'postal_code', 'country_code'];
 
+    /**
+     * What each address field holds once cleared: the street and city are
+     * required columns, so they empty rather than go null.
+     *
+     * @var array<string, string|null>
+     */
+    private const ADDRESS_BLANKS = ['line1' => '', 'line2' => null, 'city' => '', 'region' => null, 'postal_code' => null];
+
     public function execute(Vendor $vendor, VendorContact $contact): void
     {
         $party = $vendor->ensureParty();
 
-        $this->syncPoint($party, 'email', $contact->email, null);
-        $this->syncPoint($party, 'phone', $contact->phone, null);
-        $this->syncPoint($party, 'name', $contact->name, 'Contact');
+        $this->syncPoint($party, 'email', $contact->email, null, $contact->clears('email'));
+        $this->syncPoint($party, 'phone', $contact->phone, null, $contact->clears('phone'));
+        $this->syncPoint($party, 'name', $contact->name, 'Contact', $contact->clears('name'));
         $this->syncAddress($party, $contact);
     }
 
@@ -53,11 +62,15 @@ final class SyncVendorContacts
      * covers soft-deleted rows, so a value already held anywhere on the party is
      * promoted, never inserted.
      */
-    private function syncPoint(Party $party, string $channel, ?string $value, ?string $label): void
+    private function syncPoint(Party $party, string $channel, ?string $value, ?string $label, bool $clear): void
     {
         $value = trim((string) $value);
 
         if ($value === '') {
+            if ($clear) {
+                $this->clearPoint($party, $channel);
+            }
+
             return;
         }
 
@@ -98,6 +111,29 @@ final class SyncVendorContacts
             ->each(fn (ContactPoint $other): bool => $other->update(['is_primary' => false]));
     }
 
+    /**
+     * Leaves a channel with no point a person set. An owned point is retired the
+     * way a changed value is, so its history stays and naming it again brings it
+     * back. A document's point that a person promoted is demoted, not removed:
+     * the row is the purchasing record's.
+     */
+    private function clearPoint(Party $party, string $channel): void
+    {
+        ContactPoint::query()
+            ->where('party_id', $party->id)
+            ->where('channel', $channel)
+            ->get()
+            ->each(function (ContactPoint $point): void {
+                if ($point->is_primary) {
+                    $point->update(['is_primary' => false]);
+                }
+
+                if (($point->metadata['source'] ?? null) === self::SOURCE) {
+                    $point->delete();
+                }
+            });
+    }
+
     private function syncAddress(Party $party, VendorContact $contact): void
     {
         $place = array_filter(
@@ -112,26 +148,43 @@ final class SyncVendorContacts
         );
         $country = trim((string) $contact->country);
 
-        if ($place === [] && $country === '') {
+        $blanks = array_filter(self::ADDRESS_BLANKS, $contact->clears(...), ARRAY_FILTER_USE_KEY);
+        $blankCountry = $country === '' && $contact->clears('country');
+        $nothingToSet = $place === [] && $country === '';
+
+        if ($nothingToSet && $blanks === [] && ! $blankCountry) {
             return;
         }
 
         $address = Address::query()
             ->where('party_id', $party->id)
             ->where('metadata->source', self::SOURCE)
-            ->first() ?? new Address([
-                'party_id' => $party->id,
-                'purpose' => 'general',
-                'is_primary' => true,
-                'line1' => '',
-                'city' => '',
-                'country_code' => 'US',
-                'metadata' => ['source' => self::SOURCE],
-            ]);
+            ->first();
 
-        $address->fill($place);
+        if ($nothingToSet && ! $address instanceof Address) {
+            return;
+        }
 
-        if ($country !== '') {
+        if ($address instanceof Address && $nothingToSet && $blankCountry && count($blanks) === count(self::ADDRESS_BLANKS)) {
+            $address->update(['is_primary' => false]);
+            $address->delete();
+
+            return;
+        }
+
+        $address ??= new Address([
+            'party_id' => $party->id,
+            'purpose' => 'general',
+            'is_primary' => true,
+            'line1' => '',
+            'city' => '',
+            'country_code' => 'US',
+            'metadata' => ['source' => self::SOURCE],
+        ]);
+
+        $address->fill([...$blanks, ...$place]);
+
+        if ($country !== '' || $blankCountry) {
             $address->fill([
                 'country_code' => $this->countryCode($country),
                 'metadata' => $this->addressMetadata($country),
@@ -150,7 +203,8 @@ final class SyncVendorContacts
 
     /**
      * A country is free text and `country_code` is two letters and required.
-     * AFWD's vendors are American, so that is the default for anything else.
+     * AFWD's vendors are American, so that is the default for anything else,
+     * a cleared country included.
      */
     private function countryCode(string $country): string
     {
@@ -165,7 +219,7 @@ final class SyncVendorContacts
      */
     private function addressMetadata(string $country): array
     {
-        if (strlen($country) === 2) {
+        if ($country === '' || strlen($country) === 2) {
             return ['source' => self::SOURCE];
         }
 

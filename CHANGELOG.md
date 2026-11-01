@@ -8,6 +8,15 @@ On `0.x`, every minor release may break.
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-11-01
+
+### Fixed
+- A form can clear a vendor's contact. New `VendorContact::fromGroups()` takes a form's contact and address groups and works out what to clear, carried in the new `$cleared` list: a group not sent changes nothing, a field sent empty clears, and an address sent replaces the address as a whole, so a field it leaves out clears too. Moving the street no longer keeps the old suite and postal code
+- `SyncVendorContacts` retires a cleared contact point the way it retires a changed value, keeping its history, and retires an address cleared entirely. A document's point a person had promoted goes back to being non-primary and stays; what documents added is otherwise untouched. A cleared country falls back to the required `country_code` default `US` and loses its wording
+
+### Unchanged
+- A `VendorContact` without `$cleared` behaves as before: an empty value leaves its field alone, which is what `copy_vendor_contacts_to_parties` and partial writes rely on
+
 ## [0.4.1] - 2026-11-01
 
 The release 0.4.0 was meant to be. Take this one, not 0.4.0.
